@@ -1,0 +1,25 @@
+ui-craft-workspace/
+CLAUDE.md
+.DS_Store
+**/.DS_Store
+node-compile-cache/
+.atl/
+node_modules/
+mcp/node_modules/
+
+# MCP build output (rebuilt on prepublish)
+mcp/dist/
+
+# CLI: per-harness assets are hand-authored & committed under cli/assets/<harness>/.
+
+# CLI binary artifact
+cli/ui-craft
+
+# goreleaser local snapshot output
+dist/
+
+# Local tooling + out-of-scope artifacts (not part of the repo)
+.codegraph/
+.cursor/
+openspec/
+video/

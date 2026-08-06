@@ -1,0 +1,28 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "claude-forge",
+  "description": "Local-only forks of ui-craft, caveman, superpowers, and humanizer",
+  "owner": { "name": "rude" },
+  "plugins": [
+    {
+      "name": "ui-craft",
+      "source": "./ui-craft",
+      "description": "Anti-slop UI design system: discovery-first workflow, layout, typography, color, motion, accessibility, and polish for production interfaces."
+    },
+    {
+      "name": "caveman",
+      "source": "./caveman",
+      "description": "Ultra-compressed communication mode. Cuts 65% of output tokens (measured) while keeping full technical accuracy by speaking like a caveman."
+    },
+    {
+      "name": "superpowers",
+      "source": "./superpowers",
+      "description": "Process skills for brainstorming, planning, TDD, systematic debugging, and parallel agent dispatch."
+    },
+    {
+      "name": "humanizer",
+      "source": "./humanizer",
+      "description": "Remove signs of AI-generated writing from text, making it sound more natural and human. Based on Wikipedia's \"Signs of AI writing\" guide."
+    }
+  ]
+}
