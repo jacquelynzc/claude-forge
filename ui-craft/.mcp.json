@@ -1,8 +1,8 @@
 {
   "mcpServers": {
     "ui-craft": {
-      "command": "npx",
-      "args": ["-y", "ui-craft-mcp"]
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/mcp-vendor/node_modules/ui-craft-mcp/dist/server.mjs"]
     }
   }
 }

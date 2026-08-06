@@ -1,0 +1,9 @@
+{
+  "name": "ui-craft-mcp-vendored",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Pinned, committed copy of ui-craft-mcp. Served locally by node; never resolved from the npm registry at runtime. See VENDOR.md.",
+  "dependencies": {
+    "ui-craft-mcp": "0.8.2"
+  }
+}
