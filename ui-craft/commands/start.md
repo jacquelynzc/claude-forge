@@ -69,7 +69,7 @@ Pick the single highest-value next action from detected state. Use this decision
 2. **Brief exists, no token spine** → recommend `/tokens` ("establish the 3-layer token spine so builds match a system, not inline guesses").
 3. **Brief + tokens exist, building something net-new** → recommend `/sddesign <surface>` (full pipeline) or `/craft <surface>` (one-shot) — ask which.
 4. **Existing UI to improve** → route by intent: review → `ui-craft:design-reviewer` + `ui-craft:a11y-auditor` (Claude Code) or `/critique` + `/audit`; polish → `/polish`; simplify → `/distill`; flat/generic → `/bolder`; loud/busy → `/quieter`; dated site to modernize → `/redesign`.
-5. **About to ship / merge** → recommend `/finalize` (10-pass gate) and, for CI, `npx ui-craft-detect` or the `score_ui` MCP tool.
+5. **About to ship / merge** → recommend `/finalize` (10-pass gate) and the `score_ui` MCP tool (vendored, local).
 
 Print it as one clear line:
 

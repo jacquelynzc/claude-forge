@@ -7,7 +7,7 @@ Redesign `$ARGUMENTS`. Load the `ui-craft` skill and read `references/craft-inte
 
 **Step 1 — Audit what exists (before any opinion):**
 
-- Run the detector on the current source (`npx ui-craft-detect <path>`) or live page (`npx ui-craft-detect <url>`) and note findings.
+- On local source: run the `score_ui` MCP tool (vendored, local, no network) and note findings. On a live URL: no local detector reaches it — ask the user before running anything network-based (e.g. `npx ui-craft-detect <url>`), or read the rendered markup directly if reachable.
 - Inventory: pages/routes, section order, heading hierarchy (h1–h3), nav structure, conversion paths (CTAs and where they lead), forms, imagery assets, fonts, color values actually in use.
 - Read `.ui-craft/brief.md` if present — prior constraints still bind.
 

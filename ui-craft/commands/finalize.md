@@ -18,9 +18,9 @@ Look for `.ui-craft/brief.md`.
 
 ## Step 2 — Detector
 
-Run `npx ui-craft-detect` on `$ARGUMENTS` (or current working surface if no argument).
+Run the `score_ui` MCP tool (falls back to `check_anti_slop` + `tokens_lint`) on `$ARGUMENTS` (or current working surface if no argument) — these are the vendored, local detector; no network fetch needed.
 
-Capture all output. Every Critical detector finding maps directly to a block-ship finding in the report. Preserve detector source labels.
+Capture all output. Every Critical finding maps directly to a block-ship finding in the report. Preserve source labels (anti_slop / token_discipline / a11y).
 
 ---
 
