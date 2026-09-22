@@ -24,16 +24,19 @@ cp "$SRC/.claude-plugin/plugin.json" "$BUILD/.claude-plugin/"
 cp -R "$SRC/skills" "$BUILD/skills"
 cp "$SRC/README.md" "$BUILD/README.md"
 
-cat > "$BUILD/.mcp.json" <<EOF
-{
-  "mcpServers": {
+python3 - "$BUILD/.claude-plugin/plugin.json" "$MAC_ROOT" <<'PYEOF'
+import json, sys, collections
+path, mac_root = sys.argv[1], sys.argv[2]
+m = json.load(open(path), object_pairs_hook=collections.OrderedDict)
+m["mcpServers"] = {
     "computer-commander": {
-      "command": "node",
-      "args": ["$MAC_ROOT/computer-commander/mcp-vendor/dist/index.js"]
+        "command": "node",
+        "args": [mac_root + "/computer-commander/mcp-vendor/dist/index.js"],
     }
-  }
 }
-EOF
+json.dump(m, open(path, "w"), indent=2)
+open(path, "a").write("\n")
+PYEOF
 
 cat > "$BUILD/COWORK.md" <<EOF
 # Cowork package

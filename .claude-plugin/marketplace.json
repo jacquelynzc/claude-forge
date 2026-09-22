@@ -1,7 +1,7 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "claude-forge",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Local-only forks of ui-craft, caveman, superpowers, humanizer, and computer-commander",
   "owner": {
     "name": "rude"

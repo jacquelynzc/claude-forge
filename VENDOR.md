@@ -66,8 +66,8 @@ and overwrites local edits. There was no local copy worth preserving.
 
 ### What runs
 
-`computer-commander/.mcp.json` runs `node mcp-vendor/dist/index.js` off local
-disk. No npx, no registry lookup, no version resolution at launch.
+The `mcpServers` block in `computer-commander/.claude-plugin/plugin.json`
+runs `node mcp-vendor/dist/index.js` off local disk. No npx, no registry lookup, no version resolution at launch.
 
 ### Local patch
 
@@ -153,3 +153,12 @@ The marketplace entry is a fresh one rather than an edit of the old, and the
 old entry was removed.
 
 The vendored upstream is unchanged and still Desktop Commander v0.2.51.
+
+### Why mcpServers is inline
+
+The server is declared in the `mcpServers` block of `plugin.json`, not in a
+standalone `.mcp.json`. Both are valid, but inline is the form Anthropic's own
+synced desktop-commander plugin used, and that one demonstrably loaded in
+Cowork. While chasing the plugin not loading, matching the known-good shape
+exactly removed a variable. The old standalone file is kept at the repo root
+as `computer-commander.mcp.json.retired`.
