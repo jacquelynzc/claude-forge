@@ -182,3 +182,23 @@ them would alter logic, not identity.
 `dist/server.js` was edited to match rather than rebuilt, because the vendored
 tree carries production dependencies only and has no `tsc`. The updater
 rebuilds from patched source, so the two stay in sync from the next update on.
+
+### One build, two clients
+
+`plugin.json` points at an absolute path in this repo rather than
+`${CLAUDE_PLUGIN_ROOT}`:
+
+    /Users/rude/dev/claude-forge/computer-commander/mcp-vendor/dist/index.js
+
+Cowork and Claude Code both install this plugin. With `${CLAUDE_PLUGIN_ROOT}`
+they ran different copies - Cowork the working tree, Claude Code its own cache
+copy under ~/.claude/plugins/cache/ - and the cache copy kept serving old code
+after an update until it was reinstalled. Same tool names, different builds, no
+warning. The absolute path makes the working tree the single source.
+
+Cost: this repo is now load-bearing. Move or delete it and both clients lose
+the server. Rebuild the path with DC_MAC_REPO_ROOT if it ever moves.
+
+`mcp-vendor/node_modules` and `mcp-vendor/dist` are still committed, so the
+marketplace cache copy carries ~250 MB it no longer executes. Harmless, and
+kept so a fresh clone is still self-contained.
