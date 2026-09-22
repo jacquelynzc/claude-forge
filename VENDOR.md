@@ -10,6 +10,7 @@ rather than re-cloned, so the bytes here are the bytes that were in use.
 | caveman | https://github.com/JuliusBrussee/caveman | commit 0d95a81d35a9 | ~/.claude/plugins/cache/caveman/caveman/0d95a81d35a9/ |
 | superpowers | https://github.com/obra/superpowers.git | 6.1.1 | ~/.claude/plugins/cache/superpowers-dev/superpowers/6.1.1/ |
 | humanizer | https://github.com/blader/humanizer.git | 2.8.2 | ~/.claude/plugins/cache/humanizer/humanizer/2.8.2/ |
+| desktop-commander | https://github.com/wonderwhy-er/DesktopCommanderMCP.git | v0.2.51 (tag) | re-cloned from upstream 2026-09-22 |
 
 humanizer was verified byte-for-byte against
 ~/.claude/plugins/.install-manifests/humanizer@humanizer.json at import.
@@ -53,3 +54,80 @@ from `mcp/` would have silently dropped `route_task`, `check_fold`, and
 upstream file that excludes `node_modules/`; it was left unmodified and the
 vendored tree was staged with `git add -f` instead. Dependency updates go
 through the same review path as everything else — see scripts/check-upstream.sh.
+
+## desktop-commander
+
+Imported 2026-09-22. Unlike the other four, this tree was re-cloned from
+upstream at the `v0.2.51` tag rather than copied from the plugin cache,
+because what was running was `npx -y @wonderwhy-er/desktop-commander@latest`
+— an unpinned package resolved fresh from the npm registry on every app
+launch, declared by a marketplace plugin whose manifest syncs from Anthropic
+and overwrites local edits. There was no local copy worth preserving.
+
+### What runs
+
+`desktop-commander/.mcp.json` runs `node mcp-vendor/dist/index.js` off local
+disk. No npx, no registry lookup, no version resolution at launch.
+
+### Local patch
+
+`patches/0001-disable-telemetry-and-remote-flags.patch` is applied to the
+vendored source and is the reason this fork exists. It disables, at the
+source rather than by config flag:
+
+| Target | Upstream behaviour | After patch |
+|---|---|---|
+| `capture()` | POSTs GA4 events to telemetry.desktopcommander.app | returns immediately |
+| `captureBase()` | same, secondary path | returns immediately |
+| `isTelemetryDisabledByEnv()` | reads an env var | always true |
+| `FeatureFlags.fetchFlags()` | pulls desktopcommander.app/flags/v2/production.json on every start | returns immediately; cached/default flags only |
+
+The feature-flag fetch mattered as much as the telemetry: it let upstream
+change this server's behaviour (A/B experiments, onboarding injection, UI
+previews) remotely, after install, without a version bump.
+
+`config.telemetryEnabled` is also set to false, but that is belt-and-braces —
+a flag the vendor's own code decides whether to honour is not a control.
+
+`src/remote-device/` still contains a client for mcp.desktopcommander.app.
+It is dormant: it only activates when the server is spawned through the
+remote-device wrapper with `DC_REMOTE_DEVICE=true`, which `.mcp.json` does
+not do. Left in place so the diff against upstream stays small. If that
+changes upstream, the updater's diff will show it.
+
+### Dependencies
+
+`mcp-vendor/node_modules/` is **not** committed — production dependencies are
+243 MB and a new snapshot per update would balloon the repo. This is a
+deliberate departure from the ui-craft precedent. Instead
+`package-lock.json` is committed and dependencies are installed with
+`npm ci --omit=dev --ignore-scripts`, which pins every transitive package to
+an exact version and sha512 integrity hash and runs no install scripts.
+`dist/` **is** committed, so what actually executes is reviewable in git
+rather than produced by a build you have to trust.
+
+Install scripts are skipped, so `@vscode/ripgrep` never downloads its
+binary. `src/utils/ripgrep-resolver.ts` falls back to the system `rg`
+at /opt/homebrew/bin/rg.
+
+### Pruned
+
+`1080_60.mp4` (50 MB), `testemonials/`, `screenshots/`, `header.png`,
+`logo.png`, `icon.png` — marketing assets with no runtime role. The updater
+prunes the same paths from upstream before diffing, so they never appear as
+changes.
+
+### Updating
+
+    scripts/update-desktop-commander.sh                    # report only
+    scripts/update-desktop-commander.sh v0.2.60 --apply    # update, patch, rebuild, smoke-test
+
+The updater refuses to apply if a patch no longer applies cleanly, and fails
+if `LOCAL FORK PATCH` is missing from the rebuilt `dist/`. A half-patched
+tree that silently re-enables telemetry is the failure mode it exists to
+prevent. It never commits.
+
+### Verified at import
+
+`initialize` + `tools/list` over stdio returns 26 tools. All four patches
+confirmed present in the emitted JavaScript, not only the TypeScript source.

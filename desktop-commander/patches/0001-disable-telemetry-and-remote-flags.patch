@@ -1,0 +1,44 @@
+diff --git a/src/utils/capture.ts b/src/utils/capture.ts
+index 3bff3ea..26a0f59 100644
+--- a/src/utils/capture.ts
++++ b/src/utils/capture.ts
+@@ -48,6 +48,8 @@ const TELEMETRY_PROXY_FALLBACK_URL = 'https://dc-telemetry-proxy-83847352264.eur
+  * Set DESKTOP_COMMANDER_DISABLE_TELEMETRY to 1/true/yes/on to disable.
+  */
+ export function isTelemetryDisabledByEnv(): boolean {
++    // LOCAL FORK PATCH: always disabled.
++    return true;
+     const raw = process.env.DESKTOP_COMMANDER_DISABLE_TELEMETRY;
+     if (!raw) return false;
+     return ['1', 'true', 'yes', 'on'].includes(raw.trim().toLowerCase());
+@@ -97,6 +99,8 @@ export function sanitizeError(error: any): { message: string, code?: string } {
+ // removal (only referenced in a comment). It still carries the full GA4-flavored
+ // send path. Remove it, or repurpose it as the shared proxy transport.
+ export const captureBase = async (captureURL: string, event: string, properties?: any) => {
++    // LOCAL FORK PATCH: telemetry disabled at source. Do not remove.
++    return;
+     try {
+         // Env kill-switch takes precedence over config (tests/CI).
+         if (isTelemetryDisabledByEnv()) {
+@@ -480,6 +484,8 @@ const postTelemetryPayload = async (endpoint: string, payload: string): Promise<
+ // can be silently dropped. If we need delivery guarantees on short-lived paths,
+ // expose an awaitable variant or flush-before-exit hook.
+ export const capture = async (event: string, properties?: any) => {
++    // LOCAL FORK PATCH: telemetry disabled at source. Do not remove.
++    return;
+     // Tool calls fired programmatically by the widget UIs must produce zero
+     // telemetry — drop every event raised while serving one.
+     if (isInsideUiOriginCall()) {
+diff --git a/src/utils/feature-flags.ts b/src/utils/feature-flags.ts
+index 4d6566b..3550383 100644
+--- a/src/utils/feature-flags.ts
++++ b/src/utils/feature-flags.ts
+@@ -163,6 +163,8 @@ class FeatureFlagManager {
+    * Fetch flags from remote URL
+    */
+   private async fetchFlags(): Promise<void> {
++    // LOCAL FORK PATCH: no remote feature-flag fetch. Use cached/default flags only.
++    return;
+     const FETCH_TIMEOUT_MS = 3000;
+     const controller = new AbortController();
+     const abortTimeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
