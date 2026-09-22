@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
 # Update the vendored Desktop Commander fork to a new upstream tag.
 #
-#   scripts/update-desktop-commander.sh                 # report only: what changed, do the patches still apply
-#   scripts/update-desktop-commander.sh v0.2.60         # report against a specific tag
-#   scripts/update-desktop-commander.sh v0.2.60 --apply # actually update, patch, build, smoke-test
+#   scripts/update-computer-commander.sh                 # report only: what changed, do the patches still apply
+#   scripts/update-computer-commander.sh v0.2.60         # report against a specific tag
+#   scripts/update-computer-commander.sh v0.2.60 --apply # actually update, patch, build, smoke-test
 #
 # Nothing is committed. Review, then commit by hand and update VENDOR.md.
 set -euo pipefail
 
 UPSTREAM="https://github.com/wonderwhy-er/DesktopCommanderMCP.git"
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-VENDOR="$REPO_ROOT/desktop-commander/mcp-vendor"
-PATCHES="$REPO_ROOT/desktop-commander/patches"
+VENDOR="$REPO_ROOT/computer-commander/mcp-vendor"
+PATCHES="$REPO_ROOT/computer-commander/patches"
 
 TAG="${1:-}"
 APPLY="no"
@@ -47,7 +47,7 @@ rm -rf "$TMP/new/.git"
 rm -rf "$TMP/new/1080_60.mp4" "$TMP/new/testemonials" "$TMP/new/screenshots" \
        "$TMP/new/header.png" "$TMP/new/logo.png" "$TMP/new/icon.png"
 
-DIFF="/tmp/upstream-review-desktop-commander.diff"
+DIFF="/tmp/upstream-review-computer-commander.diff"
 diff -ru -x node_modules -x dist "$TMP/new" "$VENDOR" > "$DIFF" 2>/dev/null || true
 echo "==> $(grep -c '^diff ' "$DIFF" 2>/dev/null || echo 0) file(s) differ - full diff: $DIFF"
 
@@ -110,8 +110,8 @@ console.log('    '+i.result.serverInfo.name+' '+i.result.serverInfo.version+' - 
 
 echo
 echo "Done. Nothing committed. Next:"
-echo "  1. git -C $REPO_ROOT add -f desktop-commander/mcp-vendor/node_modules desktop-commander/mcp-vendor/dist   # both gitignored upstream, -f required"
+echo "  1. git -C $REPO_ROOT add -f computer-commander/mcp-vendor/node_modules computer-commander/mcp-vendor/dist   # both gitignored upstream, -f required"
   echo "  2. git -C $REPO_ROOT diff --cached --stat"
-echo "  3. bump version in desktop-commander/.claude-plugin/plugin.json"
-echo "  4. update the VENDOR.md row for desktop-commander"
+echo "  3. bump version in computer-commander/.claude-plugin/plugin.json"
+echo "  4. update the VENDOR.md row for computer-commander"
 echo "  5. commit, then restart Claude Desktop"

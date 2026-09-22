@@ -10,7 +10,7 @@ rather than re-cloned, so the bytes here are the bytes that were in use.
 | caveman | https://github.com/JuliusBrussee/caveman | commit 0d95a81d35a9 | ~/.claude/plugins/cache/caveman/caveman/0d95a81d35a9/ |
 | superpowers | https://github.com/obra/superpowers.git | 6.1.1 | ~/.claude/plugins/cache/superpowers-dev/superpowers/6.1.1/ |
 | humanizer | https://github.com/blader/humanizer.git | 2.8.2 | ~/.claude/plugins/cache/humanizer/humanizer/2.8.2/ |
-| desktop-commander | https://github.com/wonderwhy-er/DesktopCommanderMCP.git | v0.2.51 (tag) | re-cloned from upstream 2026-09-22 |
+| computer-commander | https://github.com/wonderwhy-er/DesktopCommanderMCP.git | v0.2.51 (tag) | re-cloned from upstream 2026-09-22 |
 
 humanizer was verified byte-for-byte against
 ~/.claude/plugins/.install-manifests/humanizer@humanizer.json at import.
@@ -55,7 +55,7 @@ upstream file that excludes `node_modules/`; it was left unmodified and the
 vendored tree was staged with `git add -f` instead. Dependency updates go
 through the same review path as everything else — see scripts/check-upstream.sh.
 
-## desktop-commander
+## computer-commander
 
 Imported 2026-09-22. Unlike the other four, this tree was re-cloned from
 upstream at the `v0.2.51` tag rather than copied from the plugin cache,
@@ -66,7 +66,7 @@ and overwrites local edits. There was no local copy worth preserving.
 
 ### What runs
 
-`desktop-commander/.mcp.json` runs `node mcp-vendor/dist/index.js` off local
+`computer-commander/.mcp.json` runs `node mcp-vendor/dist/index.js` off local
 disk. No npx, no registry lookup, no version resolution at launch.
 
 ### Local patch
@@ -100,7 +100,7 @@ changes upstream, the updater's diff will show it.
 `mcp-vendor/node_modules/` **is** committed, following the ui-craft precedent:
 production dependencies only, 243 MB, 22k files, no single file over 50 MB.
 The npm registry is never contacted at runtime or at install. `.gitignore` in
-`desktop-commander/` excludes `node_modules/`, so the tree is staged with
+`computer-commander/` excludes `node_modules/`, so the tree is staged with
 `git add -f` — same arrangement as ui-craft.
 
 Dependencies were installed with `npm ci --omit=dev --ignore-scripts`, which
@@ -125,8 +125,8 @@ changes.
 
 ### Updating
 
-    scripts/update-desktop-commander.sh                    # report only
-    scripts/update-desktop-commander.sh v0.2.60 --apply    # update, patch, rebuild, smoke-test
+    scripts/update-computer-commander.sh                    # report only
+    scripts/update-computer-commander.sh v0.2.60 --apply    # update, patch, rebuild, smoke-test
 
 The updater refuses to apply if a patch no longer applies cleanly, and fails
 if `LOCAL FORK PATCH` is missing from the rebuilt `dist/`. A half-patched
@@ -137,3 +137,19 @@ prevent. It never commits.
 
 `initialize` + `tools/list` over stdio returns 26 tools. All four patches
 confirmed present in the emitted JavaScript, not only the TypeScript source.
+
+### Renamed from desktop-commander
+
+Renamed to `computer-commander` on 2026-09-22. Anthropic ships a synced
+plugin named `desktop-commander`. With that name, this fork was hidden from
+the marketplace add list and never loaded, while the other four plugins in
+this marketplace loaded normally. Everything on disk was correct - installed,
+enabled, `.in_use` marker set, `dist/index.js` and `node_modules` present -
+so a name clash was the only remaining explanation.
+
+Renamed everywhere: directory, plugin manifest `name`, marketplace entry, and
+the MCP server key in `.mcp.json`. Tools are prefixed `computer-commander`.
+The marketplace entry is a fresh one rather than an edit of the old, and the
+old entry was removed.
+
+The vendored upstream is unchanged and still Desktop Commander v0.2.51.

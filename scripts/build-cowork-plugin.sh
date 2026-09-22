@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build the thin Cowork .plugin package for desktop-commander.
+# Build the thin Cowork .plugin package for computer-commander.
 #
 # Cowork installs plugins from a .plugin zip delivered in chat, and chat
 # uploads are capped at 30 MB. The full plugin is ~56 MB zipped because the
@@ -13,9 +13,9 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-SRC="$REPO_ROOT/desktop-commander"
+SRC="$REPO_ROOT/computer-commander"
 MAC_ROOT="${DC_MAC_REPO_ROOT:-/Users/rude/dev/claude-forge}"
-OUT="${1:-$REPO_ROOT/../desktop-commander.plugin}"
+OUT="${1:-$REPO_ROOT/../computer-commander.plugin}"
 BUILD="$(mktemp -d)"
 trap 'rm -rf "$BUILD"' EXIT
 
@@ -27,9 +27,9 @@ cp "$SRC/README.md" "$BUILD/README.md"
 cat > "$BUILD/.mcp.json" <<EOF
 {
   "mcpServers": {
-    "desktop-commander": {
+    "computer-commander": {
       "command": "node",
-      "args": ["$MAC_ROOT/desktop-commander/mcp-vendor/dist/index.js"]
+      "args": ["$MAC_ROOT/computer-commander/mcp-vendor/dist/index.js"]
     }
   }
 }
@@ -40,13 +40,13 @@ cat > "$BUILD/COWORK.md" <<EOF
 
 This package intentionally does NOT contain the MCP server. It runs:
 
-    node $MAC_ROOT/desktop-commander/mcp-vendor/dist/index.js
+    node $MAC_ROOT/computer-commander/mcp-vendor/dist/index.js
 
 That path is this repo's working tree. Move or delete the repo and this
 plugin stops working. Rebuild the package with scripts/build-cowork-plugin.sh
 if the repo moves, or set DC_MAC_REPO_ROOT to override the path.
 
-To update the server, run scripts/update-desktop-commander.sh and restart
+To update the server, run scripts/update-computer-commander.sh and restart
 Claude Desktop. The plugin does not need reinstalling.
 EOF
 

@@ -30,10 +30,10 @@ check humanizer   https://github.com/blader/humanizer.git
 echo
 echo "Review each diff before applying anything. Update VENDOR.md when you do."
 
-# desktop-commander vendors a built MCP server and carries a source patch, so it
+# computer-commander vendors a built MCP server and carries a source patch, so it
 # has its own updater that also verifies the patch still applies and rebuilds:
-#   scripts/update-desktop-commander.sh            # report only
-#   scripts/update-desktop-commander.sh --apply    # update to latest tag
+#   scripts/update-computer-commander.sh            # report only
+#   scripts/update-computer-commander.sh --apply    # update to latest tag
 echo
-echo "=== desktop-commander ==="
-echo "  use scripts/update-desktop-commander.sh (report-only by default)"
+echo "=== computer-commander ==="
+echo "  use scripts/update-computer-commander.sh (report-only by default)"
