@@ -199,6 +199,28 @@ warning. The absolute path makes the working tree the single source.
 Cost: this repo is now load-bearing. Move or delete it and both clients lose
 the server. Rebuild the path with DC_MAC_REPO_ROOT if it ever moves.
 
-`mcp-vendor/node_modules` and `mcp-vendor/dist` are still committed, so the
-marketplace cache copy carries ~250 MB it no longer executes. Harmless, and
-kept so a fresh clone is still self-contained.
+`mcp-vendor/node_modules` and `mcp-vendor/dist` are no longer committed - see
+below.
+
+### Dependencies and build output are not committed
+
+`mcp-vendor/node_modules/` and `mcp-vendor/dist/` are gitignored and untracked.
+They were committed initially, following the ui-craft precedent, but the
+absolute path in `plugin.json` means nothing executes the marketplace cache
+copy any more - it was ~250 MB of dead weight per install, and a fresh 250 MB
+snapshot in git per update.
+
+What IS committed: the full patched `src/`, `package-lock.json`, and the patch
+files. That is enough to reproduce the exact build.
+
+A fresh clone therefore has no runnable server. Run:
+
+    scripts/bootstrap-computer-commander.sh
+
+It installs from the pinned lockfile with `--ignore-scripts`, compiles,
+prunes to production dependencies, verifies all three patches survived into
+`dist/`, and smoke-tests over stdio.
+
+Note that `git rm --cached` stops future tracking but leaves the old blobs in
+history, so the pack does not shrink retroactively. Rewriting history with
+git-filter-repo would reclaim it and require a force-push.

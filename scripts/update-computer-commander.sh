@@ -110,7 +110,7 @@ console.log('    '+i.result.serverInfo.name+' '+i.result.serverInfo.version+' - 
 
 echo
 echo "Done. Nothing committed. Next:"
-echo "  1. git -C $REPO_ROOT add -f computer-commander/mcp-vendor/node_modules computer-commander/mcp-vendor/dist   # both gitignored upstream, -f required"
+echo "  1. git -C $REPO_ROOT diff --stat   # node_modules and dist are untracked by design"
   echo "  2. git -C $REPO_ROOT diff --cached --stat"
 echo "  3. bump version in computer-commander/.claude-plugin/plugin.json"
 echo "  4. update the VENDOR.md row for computer-commander"
