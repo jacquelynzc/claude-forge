@@ -40,7 +40,7 @@ export function flushDeferredMessages() {
 }
 deferLog('info', 'Loading server.ts');
 export const server = new Server({
-    name: "desktop-commander",
+    name: "computer-commander",
     version: VERSION,
 }, {
     capabilities: {
@@ -187,7 +187,7 @@ server.setRequestHandler(InitializeRequestSchema, async (request) => {
                 logging: {},
             },
             serverInfo: {
-                name: "desktop-commander",
+                name: "computer-commander",
                 version: VERSION,
             },
         };

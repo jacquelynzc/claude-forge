@@ -162,3 +162,23 @@ synced desktop-commander plugin used, and that one demonstrably loaded in
 Cowork. While chasing the plugin not loading, matching the known-good shape
 exactly removed a variable. The old standalone file is kept at the repo root
 as `computer-commander.mcp.json.retired`.
+
+### Server identity patch
+
+`patches/0002-rename-server-identity.patch` changes the two identity
+declarations in `src/server.ts` - the `Server` constructor and the
+`serverInfo` block - from `desktop-commander` to `computer-commander`.
+
+The plugin, marketplace entry and MCP server key were already renamed, but the
+server still announced itself as `desktop-commander` over the wire. If Cowork
+deduplicates by the announced name rather than the plugin name, the clash with
+Anthropic's synced plugin would have survived the rename.
+
+The other `desktop-commander` strings in that file are deliberately left
+alone: they compare against the CLIENT name (`desktop-commander-app`,
+`desktop-commander-client`) and gate behaviour on who is connecting. Changing
+them would alter logic, not identity.
+
+`dist/server.js` was edited to match rather than rebuilt, because the vendored
+tree carries production dependencies only and has no `tsc`. The updater
+rebuilds from patched source, so the two stay in sync from the next update on.

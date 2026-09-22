@@ -1,0 +1,22 @@
+diff --git a/src/server.ts b/src/server.ts
+index 5390a727..59b5b00f 100644
+--- a/src/server.ts
++++ b/src/server.ts
+@@ -97,7 +97,7 @@ deferLog('info', 'Loading server.ts');
+ 
+ export const server = new Server(
+     {
+-        name: "desktop-commander",
++        name: "computer-commander",
+         version: VERSION,
+     },
+     {
+@@ -265,7 +265,7 @@ server.setRequestHandler(InitializeRequestSchema, async (request: InitializeRequ
+                 logging: {},
+             },
+             serverInfo: {
+-                name: "desktop-commander",
++                name: "computer-commander",
+                 version: VERSION,
+             },
+         };
