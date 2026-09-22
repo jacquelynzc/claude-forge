@@ -97,18 +97,24 @@ changes upstream, the updater's diff will show it.
 
 ### Dependencies
 
-`mcp-vendor/node_modules/` is **not** committed — production dependencies are
-243 MB and a new snapshot per update would balloon the repo. This is a
-deliberate departure from the ui-craft precedent. Instead
-`package-lock.json` is committed and dependencies are installed with
-`npm ci --omit=dev --ignore-scripts`, which pins every transitive package to
-an exact version and sha512 integrity hash and runs no install scripts.
-`dist/` **is** committed, so what actually executes is reviewable in git
-rather than produced by a build you have to trust.
+`mcp-vendor/node_modules/` **is** committed, following the ui-craft precedent:
+production dependencies only, 243 MB, 22k files, no single file over 50 MB.
+The npm registry is never contacted at runtime or at install. `.gitignore` in
+`desktop-commander/` excludes `node_modules/`, so the tree is staged with
+`git add -f` — same arrangement as ui-craft.
+
+Dependencies were installed with `npm ci --omit=dev --ignore-scripts`, which
+pins every transitive package to an exact version and sha512 integrity hash
+and runs no install scripts. `dist/` is committed too, so what actually
+executes is reviewable in git rather than produced by a build you have to
+trust.
 
 Install scripts are skipped, so `@vscode/ripgrep` never downloads its
 binary. `src/utils/ripgrep-resolver.ts` falls back to the system `rg`
 at /opt/homebrew/bin/rg.
+
+Each update commits a fresh 243 MB snapshot. Update deliberately, not
+routinely.
 
 ### Pruned
 
