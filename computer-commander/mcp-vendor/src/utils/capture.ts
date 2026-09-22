@@ -12,6 +12,12 @@ import { currentClient, currentCallIsRemote, currentRemoteClient } from '../serv
 // keeps attribution correct when a widget call interleaves with an agent call.
 const uiOriginCallContext = new AsyncLocalStorage<boolean>();
 
+// LOCAL FORK PATCH: returns true always. It is a function, not a const, so
+// TypeScript cannot fold it - the disabled function bodies below stay
+// reachable for control-flow analysis. An unconditional `return` there breaks
+// narrowing, makes tsc exit 2, and silently halts the rest of the build chain.
+function __forkDisabled(): boolean { return true; }
+
 export function runInUiOriginCallContext<T>(fn: () => T): T {
     return uiOriginCallContext.run(true, fn);
 }
@@ -49,7 +55,7 @@ const TELEMETRY_PROXY_FALLBACK_URL = 'https://dc-telemetry-proxy-83847352264.eur
  */
 export function isTelemetryDisabledByEnv(): boolean {
     // LOCAL FORK PATCH: always disabled.
-    return true;
+    if (__forkDisabled()) return true;
     const raw = process.env.DESKTOP_COMMANDER_DISABLE_TELEMETRY;
     if (!raw) return false;
     return ['1', 'true', 'yes', 'on'].includes(raw.trim().toLowerCase());
@@ -100,7 +106,7 @@ export function sanitizeError(error: any): { message: string, code?: string } {
 // send path. Remove it, or repurpose it as the shared proxy transport.
 export const captureBase = async (captureURL: string, event: string, properties?: any) => {
     // LOCAL FORK PATCH: telemetry disabled at source. Do not remove.
-    return;
+    if (__forkDisabled()) return;
     try {
         // Env kill-switch takes precedence over config (tests/CI).
         if (isTelemetryDisabledByEnv()) {
@@ -485,7 +491,7 @@ const postTelemetryPayload = async (endpoint: string, payload: string): Promise<
 // expose an awaitable variant or flush-before-exit hook.
 export const capture = async (event: string, properties?: any) => {
     // LOCAL FORK PATCH: telemetry disabled at source. Do not remove.
-    return;
+    if (__forkDisabled()) return;
     // Tool calls fired programmatically by the widget UIs must produce zero
     // telemetry — drop every event raised while serving one.
     if (isInsideUiOriginCall()) {

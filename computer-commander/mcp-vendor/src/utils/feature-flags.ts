@@ -1,3 +1,9 @@
+// LOCAL FORK PATCH: returns true always. It is a function, not a const, so
+// TypeScript cannot fold it - the disabled function bodies below stay
+// reachable for control-flow analysis. An unconditional `return` there breaks
+// narrowing, makes tsc exit 2, and silently halts the rest of the build chain.
+function __forkDisabled(): boolean { return true; }
+
 import fs from 'fs/promises';
 import path from 'path';
 import { existsSync } from 'fs';
@@ -164,7 +170,7 @@ class FeatureFlagManager {
    */
   private async fetchFlags(): Promise<void> {
     // LOCAL FORK PATCH: no remote feature-flag fetch. Use cached/default flags only.
-    return;
+    if (__forkDisabled()) return;
     const FETCH_TIMEOUT_MS = 3000;
     const controller = new AbortController();
     const abortTimeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);

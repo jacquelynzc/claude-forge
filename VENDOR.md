@@ -224,3 +224,29 @@ prunes to production dependencies, verifies all three patches survived into
 Note that `git rm --cached` stops future tracking but leaves the old blobs in
 history, so the pack does not shrink retroactively. Rewriting history with
 git-filter-repo would reclaim it and require a force-push.
+
+### The patches broke the build, silently
+
+The first version of patch 0001 inserted an unconditional `return` at the top
+of `capture()`, `captureBase()`, `isTelemetryDisabledByEnv()` and
+`fetchFlags()`. That makes the rest of each function unreachable, which breaks
+TypeScript's control-flow narrowing, which produced ten type errors and made
+`tsc` exit 2.
+
+`tsc` emits JavaScript anyway, so `dist/index.js` ran and a smoke test passed
+with all 26 tools. But the build script is
+
+    tsc && shx cp ... && shx mkdir -p dist/data && ... && node build-ui-runtime.cjs
+
+so a non-zero `tsc` skipped every copy step. The shipped `dist/` was missing
+`data/onboarding-prompts.json`, `remote-device/scripts/`, and the three
+packaged entry scripts. `get_prompts` reads the first of those.
+
+The patches now guard with `if (__forkDisabled()) return;`, where
+`__forkDisabled()` is a function returning `boolean`. TypeScript cannot fold a
+call, so the disabled bodies stay reachable for analysis and `tsc` exits 0.
+
+`build_or_die` and `assert_dist_complete` in both scripts exist because of
+this: the build output must never be swallowed, and dist completeness is
+checked separately from whether the server merely starts. A passing smoke test
+was not enough to catch it.
