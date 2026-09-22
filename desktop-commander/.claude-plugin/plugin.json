@@ -1,12 +1,23 @@
 {
-  "name": "desktop-commander",
+  "name": "desktop-commander-local",
   "displayName": "Desktop Commander (local fork)",
-  "version": "0.2.51-local.3",
+  "version": "0.2.51-local.4",
   "description": "MCP server for terminal commands, process management, and file operations. Local fork: pinned to upstream v0.2.51, telemetry and remote feature-flag fetch removed at source, launched from local disk with node. The npm registry is never contacted at runtime.",
-  "author": { "name": "rude" },
+  "author": {
+    "name": "rude"
+  },
   "homepage": "https://github.com/jacquelynzc/claude-forge",
   "repository": "https://github.com/wonderwhy-er/DesktopCommanderMCP",
   "license": "MIT",
-  "keywords": ["shell", "terminal", "filesystem", "process", "documents", "pdf", "spreadsheet", "desktop-commander"],
+  "keywords": [
+    "shell",
+    "terminal",
+    "filesystem",
+    "process",
+    "documents",
+    "pdf",
+    "spreadsheet",
+    "desktop-commander"
+  ],
   "skills": "./skills/"
 }
