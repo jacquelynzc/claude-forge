@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "common-ground",
+  "description": "Surface, validate, persist, and graph the assumptions and decision history underlying the current project. Modes: default review, --list, --check, --graph.",
+  "version": "1.0.0",
+  "author": {
+    "name": "rude"
+  },
+  "homepage": "https://github.com/Jeffallan/claude-skills",
+  "license": "MIT",
+  "keywords": ["assumptions", "decisions", "reasoning", "mermaid", "planning"]
+}

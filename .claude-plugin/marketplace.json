@@ -1,8 +1,8 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "claude-forge",
-  "version": "1.8.0",
-  "description": "Local-only forks of ui-craft, caveman, superpowers, humanizer, and computer-commander",
+  "version": "1.9.0",
+  "description": "Local-only forks of ui-craft, caveman, superpowers, humanizer, and computer-commander, plus common-ground",
   "owner": {
     "name": "rude"
   },
@@ -31,6 +31,11 @@
       "name": "computer-commander",
       "source": "./computer-commander",
       "description": "Terminal, process and filesystem MCP server. Local fork of Desktop Commander pinned to upstream v0.2.51, telemetry and remote feature-flag fetch removed at source, run from local disk with node."
+    },
+    {
+      "name": "common-ground",
+      "source": "./common-ground",
+      "description": "Assumption ledger, decision history, and Mermaid reasoning map for the current project. Standalone adaptation of Common Ground from Jeffallan/claude-skills."
     }
   ]
 }
