@@ -1,186 +1,133 @@
 ---
 name: common-ground
-description: Surface, validate, persist, and visualize the assumptions and decision history underlying the current project. Use when asked to show assumptions, establish common ground, audit what Claude is treating as true, check whether prior premises still hold, explain how the project reached its current approach, or generate a reasoning/mind map. Supports default review plus --list, --check, and --graph modes.
+description: Maintain an evidence-backed ledger of the assumptions, constraints, decisions, uncertainties, and reasoning history a project currently rests on. Use when asked to establish common ground, inspect assumptions, audit drift, explain how a project arrived at its current approach, or visualize its reasoning history.
 argument-hint: "[--list] [--check] [--graph]"
 ---
 
 # Common Ground
 
-Make the project's hidden premises and reasoning history inspectable before they quietly harden into requirements.
+Maintain shared project understanding without silently turning inference into fact.
 
-This skill maintains two complementary artifacts:
+## Commands
 
-- **Assumption ledger** – what is currently being treated as true, where it came from, and how confidently it should be used.
-- **Reasoning graph** – how goals, evidence, assumptions, decisions, alternatives, and unresolved questions led to the present approach.
+```text
+/common-ground
+/common-ground --list
+/common-ground --check
+/common-ground --graph
+```
 
-## Modes
+- default – surface and validate current ground
+- `--list` – show saved ground
+- `--check` – revalidate saved ground against current evidence
+- `--graph` – render decision/reasoning history without mutating ground
 
-Interpret the user's request as one of four modes:
+Mode behavior: `COMMAND.md`.
 
-| Invocation | Behavior |
-|---|---|
-| `common-ground` | Surface assumptions, validate them with the user, adjust confidence, then persist |
-| `common-ground --list` | Read-only view of tracked assumptions |
-| `common-ground --check` | Revalidate existing assumptions against current project evidence |
-| `common-ground --graph` | Generate/update a Mermaid reasoning map |
+## State
 
-Natural-language requests such as “show me what we’re assuming,” “how did we get here?”, “mind map this reasoning,” or “check our premises” should activate the corresponding mode without requiring literal flags.
+Store project state at:
 
-## References
+```text
+~/.claude/common-ground/{project}/
+  COMMON-GROUND.md
+  ground.index.json
+  REASONING.html
+```
 
-Load only what is needed:
+`COMMON-GROUND.md` is human-readable.
+`ground.index.json` is canonical structured state.
+`REASONING.html` is generated visualization, not canonical state.
 
-| Need | File |
-|---|---|
-| Classify provenance and confidence | `references/assumption-classification.md` |
-| Identify project and persist state | `references/file-management.md` |
-| Build reasoning/mind map | `references/reasoning-graph.md` |
+## Core rule
 
-## Project identity
+Every meaningful claim must distinguish:
 
-Before reading or writing Common Ground state:
+1. provenance – where it came from;
+2. status – how settled it is.
 
-1. Try `git remote get-url origin`.
-2. Normalize the remote into a stable project ID.
-3. If there is no remote, use the absolute working directory and normalize it as a local project ID.
-4. Never merge state across distinct repositories merely because they share a name.
+Never promote inference into established ground merely because it sounds reasonable.
 
-See `references/file-management.md`.
+Never reconstruct a clean history when evidence only supports the current state.
 
-## Default workflow
+## Provenance
 
-### 1. Recover existing ground
+- `STATED` – explicitly established by user/source
+- `INFERRED` – strongly supported by evidence
+- `ASSUMED` – relied upon without sufficient confirmation
+- `UNCERTAIN` – conflicting or insufficient evidence
+- `RECONSTRUCTED` – historical relationship inferred after the fact
 
-Read the existing machine index first if present. Treat it as prior state, not unquestionable truth.
+## Status
 
-### 2. Inspect the present
+- `ESTABLISHED` – safe to rely on
+- `WORKING` – current operating premise, revisable
+- `OPEN` – unresolved; do not silently depend on it
 
-Use the evidence actually available in the current session and repository. Relevant sources include:
+Do not use numerical confidence scores.
 
-- explicit user statements and corrections;
-- current conversation decisions;
-- project instructions such as CLAUDE.md;
-- package/config files;
-- architecture and directory structure;
-- representative implementation patterns;
-- tests and scripts;
-- git history when it materially explains a decision;
-- the existing Common Ground ledger.
+## Evidence priority
 
-Do not exhaustively scan the repository when a small number of authoritative files establishes the point.
+Prefer:
 
-### 3. Surface assumptions
+1. explicit current user statement
+2. authoritative project docs/config
+3. current code/state
+4. persisted Common Ground
+5. conversation context
+6. cautious inference
 
-Identify premises that materially affect current or future work. Do not clutter the ledger with trivial observations.
+Newer explicit evidence may supersede older ground.
+When sources conflict, surface the conflict.
 
-For each item capture:
+## IDs
 
-- concise title;
-- full premise;
-- provenance type: `stated`, `inferred`, `assumed`, or `uncertain`;
-- confidence tier: `ESTABLISHED`, `WORKING`, or `OPEN`;
-- evidence/source;
-- scope/context;
-- dependencies or downstream decisions when relevant.
+Every persistent entry receives a permanent number and semantic prefix:
 
-Distinguish **facts** from **assumptions**. A verified fact may still belong in Common Ground when it is an important premise, but its evidence should make that clear.
+```text
+E-001   established premise/constraint
+W-002   working premise/constraint
+O-003   open premise/question
+D-004   decision
+G-005   goal
+```
 
-### 4. Show the user before persisting
+Prefixes:
 
-Present a compact review grouped by tier or topic. Highlight especially:
+- `E` – ESTABLISHED
+- `W` – WORKING
+- `O` – OPEN
+- `D` – decision
+- `G` – goal
 
-- high-impact assumptions;
-- assumptions inherited from old conversation context;
-- premises contradicted by current code;
-- things Claude supplied as defaults rather than the user choosing them;
-- unresolved choices with downstream consequences.
+The number is permanent identity.
+If a premise changes status, change only its prefix:
 
-Ask the user to confirm/correct only where their input is genuinely needed. Do not make them approve obvious repository facts one by one.
+```text
+W-002 → E-002
+W-006 → O-006
+O-009 → E-009
+```
 
-### 5. Reconcile
+Never reuse or renumber an existing number.
 
-Apply corrections without erasing provenance.
+Decisions retain `D-###`; their lifecycle is stored separately as `ACTIVE`, `SUPERSEDED`, `REJECTED`, or `OPEN`.
 
-- Types record **how the item originally entered the reasoning** and are immutable.
-- Tiers record **how much confidence to place in it now** and may change.
-- Superseded items are archived rather than silently deleted.
-- Contradicting evidence demotes or archives an item; it does not rewrite history.
+Goals retain `G-###`.
 
-### 6. Persist
+## Mutations
 
-Write both:
+Default `/common-ground` may add/update ground after validation.
 
-- `~/.claude/common-ground/{project_id}/ground.index.json` – source of truth;
-- `~/.claude/common-ground/{project_id}/COMMON-GROUND.md` – generated human-readable view.
+`--check` may update statuses when evidence clearly changed; surface material changes.
 
-Preserve history and timestamps. See `references/file-management.md`.
+`--list` is read-only.
 
-## `--list`
+`--graph` is read-only. It may reconstruct relationships for visualization but must not silently write those reconstructions into canonical ground.
 
-Read existing state and display it without modification.
+See:
 
-Show:
-
-- project and last update;
-- ESTABLISHED premises;
-- WORKING premises;
-- OPEN questions/premises;
-- stale or contradicted items if any.
-
-If no ledger exists, say so and recommend running the default mode. Do not invent one in list mode.
-
-## `--check`
-
-Re-evaluate tracked premises against the current repository and conversation.
-
-For each materially changed item classify the result as:
-
-- **still supported**;
-- **weakened**;
-- **contradicted**;
-- **cannot verify**;
-- **superseded**.
-
-Automatically update evidence-backed changes that are objective. Ask the user before changing a premise whose validity depends on intent, preference, business policy, or an unresolved choice.
-
-Update validation timestamps only for items actually checked.
-
-## `--graph`
-
-Create a Mermaid map of the reasoning that led to the current approach.
-
-The graph should answer:
-
-1. What was the root goal/problem?
-2. What evidence or constraints mattered?
-3. What assumptions entered the reasoning?
-4. What decisions were made?
-5. What alternatives were considered or implicitly rejected?
-6. What downstream decisions depend on earlier choices?
-7. Where is uncertainty still open?
-
-Do **not** fabricate a historical branch merely to make the graph look complete. If an alternative was reconstructed rather than actually discussed, label it `reconstructed alternative`.
-
-Embed the current graph in `COMMON-GROUND.md`. Also write `REASONING.mermaid` inside the Common Ground project directory for easy reuse. Do not write generated state into the user's repository unless explicitly requested.
-
-See `references/reasoning-graph.md`.
-
-## Important behavior
-
-- Surface assumptions; do not silently add new ones while auditing old ones.
-- Prefer evidence over confidence language.
-- Preserve corrections and abandoned paths because they explain why the project looks the way it does.
-- Never treat an old user statement as permanently binding when newer evidence contradicts it.
-- Never infer user intent from code when the distinction affects product/business behavior; mark it OPEN.
-- Keep the ledger compact enough to remain useful. Archive stale detail.
-- The reasoning graph is an audit aid, not a claim to expose private chain-of-thought. Represent observable premises, decisions, evidence, alternatives, and dependencies only.
-
-## Completion
-
-After a modifying run, report only the useful summary:
-
-- number of active premises by tier;
-- what changed;
-- unresolved items that could materially alter work;
-- saved state path;
-- graph path when generated.
+- `COMMAND.md`
+- `references/assumption-classification.md`
+- `references/file-management.md`
+- `references/reasoning-graph.md`

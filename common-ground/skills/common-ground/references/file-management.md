@@ -1,223 +1,180 @@
-# Common Ground File Management
+# Common Ground State
 
-## Storage
-
-Persist Common Ground outside the repository by default:
+## Location
 
 ```text
-~/.claude/common-ground/
-├── index.md
-└── {project-id}/
-    ├── COMMON-GROUND.md
-    ├── ground.index.json
-    ├── REASONING.mermaid
-    └── archive/
-        └── {timestamp}-{reason}.json
+~/.claude/common-ground/{project}/
 ```
 
-`ground.index.json` is the source of truth. Markdown and Mermaid are generated views.
-
-## Project identification
-
-### Preferred: git remote
-
-Run:
-
-```bash
-git remote get-url origin 2>/dev/null
-```
-
-Normalize common forms:
+Files:
 
 ```text
-https://github.com/acme/app.git -> github.com/acme/app
-git@github.com:acme/app.git     -> github.com/acme/app
+COMMON-GROUND.md
+ground.index.json
+REASONING.html
 ```
 
-Rules:
+The project key should be stable across sessions. Prefer repository/project identity over current directory name when available.
 
-1. remove protocol/user transport syntax;
-2. convert SSH `host:path` to `host/path`;
-3. remove trailing `.git`;
-4. sanitize only characters unsafe for the local directory structure.
+## Canonical state
 
-### Fallback: absolute path
+`ground.index.json` is canonical.
 
-If there is no remote, use the absolute working directory and derive a stable local ID. Include enough path information to avoid collisions between unrelated projects with the same basename.
+`COMMON-GROUND.md` is the readable projection.
 
-## Machine index schema
+`REASONING.html` is generated and disposable.
 
-Use a compact schema such as:
-
-```json
-{
-  "version": "1.1",
-  "project_id": "github.com/acme/app",
-  "project_name": "app",
-  "created": "2026-09-27T12:00:00-04:00",
-  "last_updated": "2026-09-27T12:00:00-04:00",
-  "last_checked": null,
-  "next_id": 4,
-  "assumptions": [
-    {
-      "id": "A001",
-      "title": "Short title",
-      "type": "stated",
-      "tier": "ESTABLISHED",
-      "status": "active",
-      "assumption": "Full premise",
-      "source": "User explicitly required this in project instructions",
-      "context": "Applies to preview generation",
-      "created": "2026-09-27T12:00:00-04:00",
-      "validated": "2026-09-27T12:00:00-04:00",
-      "dependencies": ["D002"],
-      "supersedes": null,
-      "history": [
-        {
-          "date": "2026-09-27T12:00:00-04:00",
-          "action": "created",
-          "from_tier": null,
-          "to_tier": "ESTABLISHED",
-          "reason": "Explicit user requirement"
-        }
-      ]
-    }
-  ],
-  "decisions": [
-    {
-      "id": "D002",
-      "title": "Chosen implementation direction",
-      "status": "chosen",
-      "source": "Conversation and repository evidence",
-      "depends_on": ["A001"],
-      "alternatives": ["D003"],
-      "created": "2026-09-27T12:00:00-04:00"
-    }
-  ],
-  "archived": []
-}
-```
-
-The `decisions` collection is optional until `--graph` or decision-history analysis needs it. Do not manufacture decisions solely to populate the schema.
+Never treat graph reconstruction as canonical evidence.
 
 ## IDs
 
-- Assumptions: `A001`, `A002`, ...
-- Decisions: `D001`, `D002`, ...
-- Questions/unknowns may use assumption IDs with type `uncertain`; avoid another ID namespace unless necessary.
-- Never reuse IDs.
+Every entry receives a unique permanent number.
 
-## Human-readable file
+Its prefix communicates semantic role or current status:
 
-Generate `COMMON-GROUND.md` from the JSON source of truth.
+```text
+E-###   established premise/constraint
+W-###   working premise/constraint
+O-###   open premise/question
+D-###   decision
+G-###   goal
+```
 
-Recommended shape:
+For E/W/O entries, status changes preserve the number:
+
+```text
+W-014 → E-014
+O-021 → W-021
+```
+
+`D-###` and `G-###` prefixes remain stable.
+
+Never reuse a number, including numbers belonging to superseded or removed historical entries.
+
+## Entry schema
+
+```json
+{
+  "id": "W-001",
+  "number": 1,
+  "type": "premise",
+  "text": "Reusable parts are the primary composition model.",
+  "provenance": "INFERRED",
+  "status": "WORKING",
+  "decision_status": null,
+  "evidence": ["project architecture"],
+  "created": "ISO-8601",
+  "updated": "ISO-8601"
+}
+```
+
+`type` may be:
+
+```text
+goal
+premise
+constraint
+decision
+open_question
+```
+
+For decisions, `decision_status` may be:
+
+```text
+ACTIVE
+SUPERSEDED
+REJECTED
+OPEN
+```
+
+The numeric `number` is permanent identity.
+
+`id` is its current human-readable representation.
+
+Add fields only when they provide durable value.
+
+## COMMON-GROUND.md
+
+Keep it readable and compact.
+
+Recommended structure:
 
 ```markdown
-# Project Common Ground
+# Common Ground
 
-**Project:** ...
-**Project ID:** ...
-**Last Updated:** ...
-**Last Checked:** ...
+## Goals
 
-## ESTABLISHED
+### G-001
+Produce believable $10k websites efficiently.
 
-### A001: Title
-- **Type:** stated
-- **Premise:** ...
-- **Evidence:** ...
-- **Context:** ...
-- **Validated:** ...
+## Established
 
-## WORKING
-...
+### E-002 · STATED
+Client owns the repository.
 
-## OPEN
-...
+## Working
 
-## Superseded / Archived
-...
+### W-006 · INFERRED
+Reusable parts are the primary composition model.
 
-## Decision History
-...
+## Open
 
-## Reasoning Graph
-```mermaid
-...
+### O-011 · UNCERTAIN
+Preview sites improve outbound response rates.
+
+## Decisions
+
+### D-003 · SUPERSEDED
+Themes were the primary system.
+Superseded by: D-007
+
+### D-007 · ACTIVE
+Use reusable parts as the primary composition system.
 ```
 
-## History
-...
-```
+Do not turn it into a session transcript.
 
-Do not manually maintain duplicated facts in Markdown that are absent from JSON.
+## Updates
 
-## Global registry
+When evidence changes:
 
-Maintain `~/.claude/common-ground/index.md` as a lightweight registry:
+- preserve numeric identity;
+- update E/W/O prefix when status changes;
+- update provenance/status/evidence;
+- preserve meaningful decision history;
+- update timestamps;
+- regenerate `COMMON-GROUND.md`.
 
-```markdown
-# Common Ground Projects
+Do not delete superseded consequential decisions merely because they are no longer active.
 
-| Project | ID | Active premises | Open | Last checked |
-|---|---|---:|---:|---|
-| app | github.com/acme/app | 12 | 2 | 2026-09-27 |
-```
+Avoid preserving trivial churn.
 
-This is convenience metadata, not authoritative project state.
+## Conflicts
 
-## Safe update procedure
+When new evidence conflicts with saved ground:
 
-For every modifying operation:
+1. identify the conflict;
+2. prefer stronger/newer authoritative evidence;
+3. downgrade, update, or supersede the old entry;
+4. preserve consequential history;
+5. surface material changes.
 
-1. Read `ground.index.json` if it exists.
-2. Validate that it parses.
-3. Preserve existing IDs/history.
-4. Apply additions, tier changes, supersessions, or evidence updates.
-5. Update timestamps narrowly – do not mark unchecked items as checked.
-6. Write valid JSON.
-7. Regenerate `COMMON-GROUND.md` from JSON.
-8. Regenerate `REASONING.mermaid` if graph state changed.
-9. Update global registry.
+Do not silently rewrite history.
 
-When practical, write to a temporary file then replace the destination to reduce corruption risk.
+## Read-only modes
 
-## Archiving
+`--list` does not mutate state.
 
-Before a destructive schema migration or recovery operation, save the prior machine index under `archive/` with timestamp and reason.
+`--graph` does not mutate state.
 
-Normal tier changes do not require a full archive because each item carries history.
+Graph-only reconstructed relationships remain graph-only unless separately validated through normal Common Ground workflow.
 
-Superseded assumptions should leave the active list but remain available in `archived` with:
+## Recovery
 
-- original ID;
-- full original provenance;
-- date archived;
-- reason;
-- replacement ID when applicable.
+If one state file is missing:
 
-## Corruption / mismatch handling
+- rebuild `COMMON-GROUND.md` from `ground.index.json`;
+- if JSON is missing but Markdown exists, reconstruct cautiously and mark ambiguous fields;
+- if both are missing, initialize new ground.
 
-### JSON corrupt, Markdown readable
-
-Do not silently overwrite. Preserve the broken JSON in `archive/`, reconstruct conservatively from Markdown, and tell the user recovery occurred.
-
-### Markdown missing, JSON valid
-
-Regenerate Markdown.
-
-### Mermaid missing
-
-Regenerate only when graph mode is requested or graph state already exists.
-
-### Permission denied
-
-Report the exact path and do not pretend persistence succeeded.
-
-## Privacy and repository hygiene
-
-- Default storage is under `~/.claude`, not the repository.
-- Do not persist secrets, credentials, tokens, raw private keys, or unnecessary personal data.
-- Evidence should identify the source sufficiently for audit without copying sensitive content.
-- Do not commit Common Ground state unless the user explicitly asks to make it project-shared.
+Never infer canonical state from `REASONING.html`.
