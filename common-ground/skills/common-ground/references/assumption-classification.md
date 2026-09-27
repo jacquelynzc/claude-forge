@@ -1,162 +1,170 @@
 # Assumption Classification
 
-Common Ground tracks two independent properties:
+Every Common Ground premise or constraint has independent provenance and status.
 
-1. **Provenance type** – how the premise entered the reasoning.
-2. **Confidence tier** – how strongly it should be relied on now.
+## Provenance
 
-Keeping them separate prevents “the user once mentioned this” from turning into “this is permanently true.”
+### STATED
 
-## Provenance types
+Explicitly established by the user or authoritative source.
 
-### `stated`
+```text
+STATED: Client must own the repository.
+```
 
-The user explicitly supplied the premise, requirement, preference, correction, or decision.
+Do not reinterpret clear statements merely because another approach seems better.
 
-Evidence should point to the user statement or a durable project instruction that clearly represents user intent.
+### INFERRED
 
-Examples:
+Supported by project evidence but not explicitly stated.
 
-- “Use vanilla JS, not React.”
-- “Do not expose this field publicly.”
-- “The preview must take under five minutes.”
+```text
+INFERRED: Preview speed is prioritized over per-lead customization.
+```
 
-A stated premise is not automatically permanent. Newer user statements can supersede it.
+State the evidence.
 
-### `inferred`
+### ASSUMED
 
-The premise is derived from observable project evidence.
+Currently relied upon without enough evidence.
 
-Typical evidence:
+```text
+ASSUMED: Five-page sites are the default deliverable.
+```
 
-- package/config files;
-- repeated code patterns;
-- directory structure;
-- tests;
-- scripts;
-- schemas;
-- git history.
+Use sparingly. Material assumptions should be surfaced for validation.
 
-Examples:
+### UNCERTAIN
 
-- A `tsconfig.json` and `.ts` source files imply TypeScript is in use.
-- Every route using the same middleware suggests that middleware is the current auth boundary.
+Evidence is missing, weak, or conflicting.
 
-Inference strength depends on coverage and whether counterexamples exist.
+```text
+UNCERTAIN: Preview sites materially increase response rate.
+```
 
-### `assumed`
+Do not resolve uncertainty by guessing.
 
-Claude introduced the premise as a default, convention, best practice, or pragmatic choice without direct evidence that this project requires it.
+### RECONSTRUCTED
 
-Examples:
+A historical relationship inferred from present evidence rather than directly documented.
 
-- Assuming 80% test coverage is required.
-- Choosing REST because no API style was specified.
-- Assuming mobile-first behavior without a product requirement.
+```text
+RECONSTRUCTED: Theme limitations likely contributed to the move toward reusable parts.
+```
 
-These deserve special scrutiny because they are the easiest way model defaults become accidental requirements.
+Useful for reasoning maps, but not equivalent to known history.
 
-### `uncertain`
+## Status
 
-The premise is genuinely unresolved, ambiguous, conflicting, or unsupported.
+### ESTABLISHED
 
-Examples:
+Supported strongly enough to rely on during work.
 
-- Two documents specify different launch dates.
-- It is unclear whether a feature must work offline.
-- Code supports two flows and there is no evidence which one is canonical.
+Prefix: `E-`
 
-Do not disguise uncertainty as an inference.
+### WORKING
 
-## Type immutability
+Current operating premise that may change.
 
-Once an item is recorded, preserve its original type as provenance. If later evidence changes what is believed, update the tier, evidence, status, or archive/supersede the item rather than rewriting how it originally entered the reasoning.
+Prefix: `W-`
 
-If a premise is replaced by a genuinely new premise, create a new ID and link the old one as superseded.
+### OPEN
 
-## Confidence tiers
+Unresolved and potentially consequential.
 
-### `ESTABLISHED`
+Prefix: `O-`
 
-Strong enough to act on as a premise without repeatedly asking.
+## Independence
 
-Good reasons:
+Provenance and status are separate.
 
-- explicit current user validation;
-- direct authoritative configuration;
-- multiple strong corroborating sources;
-- objective fact directly observed in the repository.
+Valid combinations include:
 
-Do not promote subjective intent merely because code happens to implement it today.
+```text
+E-001 · STATED
+E-002 · INFERRED
+W-003 · INFERRED
+W-004 · ASSUMED
+O-005 · UNCERTAIN
+O-006 · RECONSTRUCTED
+```
 
-### `WORKING`
+Do not mechanically promote `STATED` to `ESTABLISHED` if later evidence contradicts it.
 
-Reasonable and useful, but should be revisited if contradictory evidence appears.
+When status changes, preserve numeric identity:
 
-Good reasons:
+```text
+W-003 → E-003
+W-004 → O-004
+O-005 → W-005
+```
 
-- clear but non-authoritative code pattern;
-- plausible inference from a single reliable source;
-- informal user confirmation;
-- low-impact default that is safe to reverse.
+## Materiality
 
-### `OPEN`
+Track an item when changing it could alter:
 
-Do not make consequential decisions from this premise without resolving it.
+- architecture;
+- product behavior;
+- scope;
+- strategy;
+- deliverable;
+- user experience;
+- significant implementation;
+- downstream decisions.
 
-Use when:
+Do not fill the ledger with trivial observations.
 
-- evidence conflicts;
-- there is no evidence;
-- the choice depends on user/business intent;
-- the assumption has high downstream impact and weak support;
-- a previous premise has become stale.
+## Decisions
 
-## Impact adjustment
+Consequential decisions use `D-###`.
 
-Confidence is not the same as risk. A medium-confidence assumption about naming can remain WORKING. A medium-confidence assumption about security boundaries, destructive migration behavior, money movement, privacy, public publishing, or irreversible architecture should usually be surfaced as OPEN until confirmed.
+Decision states:
 
-## Validation outcomes
+- `ACTIVE`
+- `SUPERSEDED`
+- `REJECTED`
+- `OPEN`
 
-During `--check`, use these states:
+The `D-` prefix remains stable regardless of lifecycle.
 
-| Outcome | Meaning | Typical action |
-|---|---|---|
-| still supported | Evidence remains consistent | Keep tier; update validation evidence/date |
-| weakened | Some support disappeared or exceptions emerged | Consider demotion |
-| contradicted | Current evidence conflicts with premise | Demote or supersede/archive |
-| cannot verify | Required evidence is unavailable | Do not pretend it was validated |
-| superseded | A newer decision replaced it | Archive old item and link replacement |
+Distinguish:
 
-## Useful extraction categories
+- **Alternative** – genuinely considered.
+- **Rejected** – explicitly ruled out.
+- **Superseded** – previously active, later replaced.
 
-Do not force every project into these, but they are good search lenses:
+Do not infer “rejected” merely because another option was chosen.
 
-- Goal / success condition
-- Scope / exclusions
-- Product behavior
-- Architecture / stack
-- Data / persistence
-- Security / privacy
-- Integration contracts
-- Design / UX
-- Coding conventions
-- Testing / quality
-- Deployment / operations
-- Business constraints
-- User preferences
-- Timeline / sequencing
-- Known unknowns
+## Goals
 
-## Quality test
+Material project goals use `G-###`.
 
-Track a premise only if at least one is true:
+Goals retain their IDs even when achieved, changed, or no longer primary.
 
-- changing it would change implementation;
-- it explains an important existing decision;
-- it could cause expensive rework if wrong;
-- it is likely to be forgotten across sessions;
-- it resolves a recurring ambiguity;
-- it is an unresolved dependency for future work.
+## Evidence
 
-Otherwise leave it out.
+Attach concise evidence pointers when practical:
+
+```text
+Evidence:
+- docs/ARCHITECTURE.md
+- package.json
+- user statement
+- D-004
+```
+
+Never fabricate quotes, dates, files, or historical rationale.
+
+If evidence proves only what exists now, it does not automatically prove why it was chosen.
+
+## Classification test
+
+Before saving an entry ask:
+
+1. What exactly is being claimed?
+2. What evidence supports it?
+3. Is that evidence current?
+4. Does it establish fact, inference, assumption, or uncertainty?
+5. How materially would work change if this were wrong?
+
+When uncertain, classify downward rather than manufacturing certainty.
