@@ -11,6 +11,7 @@ rather than re-cloned, so the bytes here are the bytes that were in use.
 | superpowers | https://github.com/obra/superpowers.git | 6.1.1 | ~/.claude/plugins/cache/superpowers-dev/superpowers/6.1.1/ |
 | humanizer | https://github.com/blader/humanizer.git | 2.8.2 | ~/.claude/plugins/cache/humanizer/humanizer/2.8.2/ |
 | computer-commander | https://github.com/wonderwhy-er/DesktopCommanderMCP.git | v0.2.51 (tag) | re-cloned from upstream 2026-09-22 |
+| common-ground | https://github.com/Jeffallan/claude-skills (inspiration only) | 1.0.0 | original adaptation, added 2026-09-27 |
 
 humanizer was verified byte-for-byte against
 ~/.claude/plugins/.install-manifests/humanizer@humanizer.json at import.
@@ -250,3 +251,16 @@ call, so the disabled bodies stay reachable for analysis and `tsc` exits 0.
 this: the build output must never be swallowed, and dist completeness is
 checked separately from whether the server merely starts. A passing smoke test
 was not enough to catch it.
+
+## common-ground
+
+Added 2026-09-27. Not a verbatim copy: an original standalone adaptation of the
+Common Ground command from Jeffallan/claude-skills (MIT), see
+`common-ground/LICENSE-NOTICE.md`. There is no fork point to diff against, so
+it is left out of scripts/check-upstream.sh.
+
+Packaged as a plugin: `SKILL.md` and `references/` moved under
+`skills/common-ground/`, manifest added. The `COMMAND.md` wrapper was dropped
+because a same-named command would collide with the skill; its
+`argument-hint` moved into the skill frontmatter. State is written outside the
+repo to `~/.claude/common-ground/{project-id}/`.
