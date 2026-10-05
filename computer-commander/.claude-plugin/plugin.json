@@ -1,8 +1,8 @@
 {
   "name": "computer-commander",
   "displayName": "Computer Commander",
-  "version": "1.5.0",
-  "description": "Terminal, process and filesystem MCP server. Local fork of Desktop Commander pinned to upstream v0.2.51, telemetry and remote feature-flag fetch removed at source, run from local disk with node. The npm registry is never contacted at runtime.",
+  "version": "1.6.0",
+  "description": "Terminal, process and filesystem MCP server. Local fork of Desktop Commander pinned to upstream v0.2.52, telemetry and remote feature-flag fetch removed at source, run from local disk with node. The npm registry is never contacted at runtime.",
   "author": {
     "name": "rude"
   },

@@ -10,7 +10,7 @@ rather than re-cloned, so the bytes here are the bytes that were in use.
 | caveman | https://github.com/JuliusBrussee/caveman | commit 0d95a81d35a9 | ~/.claude/plugins/cache/caveman/caveman/0d95a81d35a9/ |
 | superpowers | https://github.com/obra/superpowers.git | 6.1.1 | ~/.claude/plugins/cache/superpowers-dev/superpowers/6.1.1/ |
 | humanizer | https://github.com/blader/humanizer.git | 2.8.2 | ~/.claude/plugins/cache/humanizer/humanizer/2.8.2/ |
-| computer-commander | https://github.com/wonderwhy-er/DesktopCommanderMCP.git | v0.2.51 (tag) | re-cloned from upstream 2026-09-22 |
+| computer-commander | https://github.com/wonderwhy-er/DesktopCommanderMCP.git | v0.2.52 (tag) | re-cloned from upstream 2026-09-22, updated to v0.2.52 on 2026-10-05 |
 | common-ground | https://github.com/Jeffallan/claude-skills (inspiration only) | 1.0.0 | original adaptation, added 2026-09-27 |
 
 humanizer was verified byte-for-byte against
@@ -153,7 +153,8 @@ the MCP server key in `.mcp.json`. Tools are prefixed `computer-commander`.
 The marketplace entry is a fresh one rather than an edit of the old, and the
 old entry was removed.
 
-The vendored upstream is unchanged and still Desktop Commander v0.2.51.
+The rename did not touch the vendored upstream, which was Desktop Commander
+v0.2.51 at the time.
 
 ### Why mcpServers is inline
 
@@ -251,6 +252,41 @@ call, so the disabled bodies stay reachable for analysis and `tsc` exits 0.
 this: the build output must never be swallowed, and dist completeness is
 checked separately from whether the server merely starts. A passing smoke test
 was not enough to catch it.
+
+### Updated to v0.2.52
+
+Updated 2026-10-05 with `scripts/update-computer-commander.sh v0.2.52 --apply`.
+16 files differed; both patches applied unchanged.
+
+Upstream content is remote-device reliability work and docs: pending-call
+recovery after reconnect (#752), desynchronized realtime recovery (#745),
+auth polling stopped on terminal server answers (#783), device readiness bound
+to the local executor rather than just the channel (#717, #724), client-neutral
+process tool descriptions (#699), and added install-funnel telemetry (#736).
+No new local execution surface.
+
+Reviewed beyond "the patches still apply", because a patch can apply cleanly
+and still cover nothing if upstream moves a call:
+
+- Outbound hosts in `src/**/*.ts` match the v0.2.51 baseline. The only
+  additions are `www.google.com` (a Chrome install link in
+  `src/tools/pdf/markdown.ts`) and `example.com` (placeholder text in a URL
+  input in the file-preview editor). Neither is a request target.
+- All four patch targets still exist by name: `isTelemetryDisabledByEnv()`,
+  `captureBase()` and `capture()` in `src/utils/capture.ts`, `fetchFlags()` in
+  `src/utils/feature-flags.ts`.
+- `captureBase()` has no call sites outside `capture.ts`, and `captureRemote()`
+  — the wrapper the new install-funnel telemetry uses — routes through
+  `capture()`. The patch still covers every path.
+- Upstream did not touch `capture.ts` or `feature-flags.ts` between the two
+  tags; the only diff in those files is this fork's own patch.
+
+Verified after rebuild: `LOCAL FORK PATCH` present in `dist/utils/capture.js`
+and `dist/utils/feature-flags.js`, `dist/` complete, and `initialize` +
+`tools/list` over stdio returns `computer-commander 0.2.52` with 26 tools.
+
+Upstream also dropped a stale `test.acidpictures.org` example host from
+`src/remote-device/README.md`, which the v0.2.51 tree carried. Docs only.
 
 ## common-ground
 
