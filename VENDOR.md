@@ -288,6 +288,35 @@ and `dist/utils/feature-flags.js`, `dist/` complete, and `initialize` +
 Upstream also dropped a stale `test.acidpictures.org` example host from
 `src/remote-device/README.md`, which the v0.2.51 tree carried. Docs only.
 
+### Vendored dist and node_modules, 1.6.1
+
+Commit 290c671d, 2026-10-14. The v0.2.52 update (f3de7a2f) committed sources,
+tests and docs only. `mcp-vendor/dist` and `mcp-vendor/node_modules` are
+ignored by `mcp-vendor/.gitignore`, so a plain `git add -A` skipped both and
+neither was ever force-added. The rebuild check above passed because it looked
+at `dist/` on disk, not at what git was tracking: locally the server ran fine,
+while a fresh clone or marketplace install of 1.6.0 had no built server and no
+runtime deps.
+
+Fixed by `git add -f computer-commander/mcp-vendor/dist
+computer-commander/mcp-vendor/node_modules` — 239 + 22060 files, about 246 MB.
+Plugin 1.6.0 to 1.6.1, marketplace 1.11.0 to 1.11.1.
+
+Verified before staging, since `dist` is the one thing here that cannot be
+reviewed by reading sources: `__forkDisabled` is present in
+`dist/utils/capture.js` at `isTelemetryDisabledByEnv`, `captureBase` and
+`capture`, and in `dist/utils/feature-flags.js` at `fetchFlags`. The committed
+build is the patched build. No file over 50 MB, no nested `.git` directories.
+
+Two standing notes. The vendored `node_modules` carries two darwin-arm64 native
+binaries (`@img/sharp-darwin-arm64`, `fsevents`), so the tree is macOS/arm64
+only. And it adds roughly 245 MB to git history per upstream release;
+committing `dist` alone and running `npm ci --ignore-scripts` at install time
+would avoid that, at the cost of changing the update workflow.
+
+The post-apply checklist in the weekly upstream-check task now calls out the
+force-add and the `__forkDisabled` count explicitly.
+
 ## common-ground
 
 Added 2026-09-27. Not a verbatim copy: an original standalone adaptation of the
