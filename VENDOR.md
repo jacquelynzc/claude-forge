@@ -317,6 +317,66 @@ would avoid that, at the cost of changing the update workflow.
 The post-apply checklist in the weekly upstream-check task now calls out the
 force-add and the `__forkDisabled` count explicitly.
 
+### Removed install-time telemetry senders, 1.6.2
+
+Commit 74d85c9d, 2026-10-14. Found while re-checking what the weekly upstream
+task actually covers.
+
+Three files sat at the root of `mcp-vendor` as plain `.js`:
+`track-installation.js`, `setup-claude-server.js`,
+`uninstall-claude-server.js`. The build copied them into `dist/` verbatim
+(`shx cp ... dist/`), so they never passed through `tsc` and never existed in
+`src/`. That placed them outside both guard rails at once: `patches/0001`
+targets `src/utils/*.ts`, and the weekly check greps
+`src/ --include=*.ts`.
+
+`track-installation.js` was an independent sender. It did not call
+`capture()`, so `__forkDisabled` never applied:
+
+    TELEMETRY_PROXY_URL          = https://telemetry.desktopcommander.app/mp/collect
+    TELEMETRY_PROXY_FALLBACK_URL = https://dc-telemetry-proxy-83847352264.europe-west1.run.app/mp/collect
+
+It read `clientId` from `~/.claude-server-commander/config.json` — a stable
+cross-install identifier — and did not consult the `telemetryEnabled` config
+flag. Upstream wires it to `postinstall`.
+
+It had not fired here, because `scripts/update-computer-commander.sh` runs
+`npm ci --ignore-scripts` on both install passes. One bare `npm install` in
+that directory would have run it. Worth stating plainly: the protection was a
+flag in the updater, not the patch set.
+
+Note how the host-baseline check failed to catch this. Both hosts were already
+on the approved baseline, because `capture.ts` references them too. Matching on
+*which hosts appear* cannot distinguish a host referenced from patched code
+from the same host referenced from unpatched code. The useful check is over
+call sites, not hosts.
+
+Fix: delete all three files, drop `postinstall`, and drop the three filenames
+from the build's `shx cp`. Also dropped `setup`, `setup:debug` and `remove`,
+which invoked the deleted files and ran `npm install` without
+`--ignore-scripts`.
+
+Recorded as `patches/0003` rather than an `rm` step in the updater, so that any
+upstream change to these files makes the patch fail loudly the way 0001 and
+0002 do; an `rm` would silently no-op if upstream renamed something. Verified
+the patch applies clean to a fresh `v0.2.52` clone.
+
+After the change, the telemetry hosts appear only in `src/utils/capture.ts` and
+`dist/utils/capture.js`, both guarded. Smoke test: `initialize` + `tools/list`
+over stdio returns `computer-commander 0.2.52` with 26 tools; `LOCAL FORK
+PATCH` present 4x in `dist/utils/capture.js`, 2x in
+`dist/utils/feature-flags.js`.
+
+New steady state for the weekly report: **3 patches**, and the vendored tree
+differs from upstream in `src/server.ts`, `src/utils/capture.ts`,
+`src/utils/feature-flags.ts`, `package.json`, plus the three deleted root
+`.js` files.
+
+Also changed this day, outside the repo: `allowedDirectories` in
+`~/.claude-server-commander/config.json` dropped `/Users/rude/Downloads`, now
+`["/Users/rude/sandbox", "/Users/rude/dev"]`. Downloads is where untrusted
+files land; it does not need to be reachable by the agent.
+
 ## common-ground
 
 Added 2026-09-27. Not a verbatim copy: an original standalone adaptation of the
