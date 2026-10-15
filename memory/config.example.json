@@ -118,7 +118,7 @@
       "compression off, or the #346 skip-forever state) leaves the same kind of",
       "span appended every round with nothing to bound it. This does NOT cap or",
       "truncate the file; it only logs (report_error, reaching hook-errors.log,",
-      "surfaced by /remember:doctor) the first time the file crosses the line,",
+      "surfaced by /memory:doctor) the first time the file crosses the line,",
       "so the growth is visible instead of silent. Set 0 to disable.",
       "Default 2000000 -- comfortably above a healthy day's worth of staged",
       "entries and comfortably below consolidate_max_bytes, so a warning here",
@@ -132,7 +132,7 @@
       "kilobytes, so this only fires on a store that is already broken; in #346",
       "a 6.4GB recent.md froze every `claude` launch in that project. Set 0 to",
       "disable. When this is configured BELOW the bundled default, the",
-      "over-cap notice says 'capped by config' and drops the /remember:doctor",
+      "over-cap notice says 'capped by config' and drops the /memory:doctor",
       "suggestion (#842) -- a deliberately lowered cap is not a broken store."
     ],
     "session_start_max_bytes": [

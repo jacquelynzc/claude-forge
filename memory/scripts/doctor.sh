@@ -18,7 +18,7 @@
 #
 # USAGE
 #   bash scripts/doctor.sh
-#   Invoked by the /remember:doctor slash command (commands/doctor.md), which runs
+#   Invoked by the /memory:doctor slash command (commands/doctor.md), which runs
 #   this via ${CLAUDE_PLUGIN_ROOT}/scripts/doctor.sh and relays the output
 #   verbatim. Safe to also run directly from a shell for the same report.
 #
@@ -1060,7 +1060,7 @@ fi
 echo ""
 
 # ── 6b. SessionStart duration (#706) ────────────────────────────────────────
-# "The daily log is right for the record, and /remember:doctor is right for
+# "The daily log is right for the record, and /memory:doctor is right for
 # the read-out" -- the issue's own words. session-start-hook.sh writes
 # "session-start took Ns" into the daily log on EVERY start (never gated);
 # this reads the most recent one back so "is my host slow" is one command

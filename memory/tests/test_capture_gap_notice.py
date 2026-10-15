@@ -375,13 +375,13 @@ def test_a_session_captured_only_by_recovery_is_not_flagged(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# The notice must not contradict /remember:doctor's own verdict (#745)
+# The notice must not contradict /memory:doctor's own verdict (#745)
 # ---------------------------------------------------------------------------
 #
 # The recovery block above (config default `features.recovery: true`) force-
 # saves an unsaved PREV_ID from its transcript, in the background, before this
 # check runs. A reporter saw the flat "not captured, run doctor" wording fire,
-# then ran /remember:doctor nine hours later and got "capture is working" --
+# then ran /memory:doctor nine hours later and got "capture is working" --
 # consistent with a recovery save landing well after the notice was written
 # and read. Both statements were true; only the notice sounded like a fault
 # nothing had addressed.
@@ -456,7 +456,7 @@ def test_a_previous_session_recovery_cannot_save_keeps_the_original_wording(tmp_
         "remember: your previous session was not captured. If you just "
         "installed or enabled the plugin, that is expected -- capture starts "
         "now. Otherwise its hooks were not registered for that session; run "
-        "/remember:doctor."
+        "/memory:doctor."
     ), f"original wording changed unexpectedly: {text!r}"
 
 

@@ -808,7 +808,7 @@ HAIKU_VARS=$(cd "$PIPELINE_DIR" && _remember_run_python -m pipeline.shell call-h
     # its stdout JSON by pipeline/haiku.py's _failure_detail() and printed
     # here by `pipeline.shell call-haiku`'s own stderr handler -- is exactly
     # the diagnosis an operator needs when saves silently stop working.
-    # Without this, hook-errors.log (what /remember:doctor tails, and what a
+    # Without this, hook-errors.log (what /memory:doctor tails, and what a
     # reporter is asked to paste) says only "exited 1" while the real cause
     # -- an expired token, an exhausted balance, a rate limit -- sat in a
     # second log file nobody was looking at (#693: 12 occurrences over

@@ -497,7 +497,7 @@ def _dispatch_warned_in_log(tmp_path: Path, keyword: str) -> bool:
 #
 # What these pin is the post-condition, not a function's return value: a hook
 # that dies with a diagnostic leaves that diagnostic in a file a human reads.
-# `/remember:doctor` reports "Recent errors" from `logs/hook-errors.log`, so
+# `/memory:doctor` reports "Recent errors" from `logs/hook-errors.log`, so
 # that is the file, and it is asserted by name.
 
 
@@ -505,7 +505,7 @@ def _human_readable_reports(tmp_path: Path) -> str:
     """Everything a human is ever shown about a dispatch failure.
 
     The daily log (log()'s destination) and hook-errors.log, which
-    /remember:doctor tails under "Recent errors". Concatenated, because
+    /memory:doctor tails under "Recent errors". Concatenated, because
     "somewhere a human reads" is the contract; _doctor_reports below pins the
     surfaced route specifically.
     """
@@ -517,7 +517,7 @@ def _human_readable_reports(tmp_path: Path) -> str:
 
 
 def _doctor_reports(tmp_path: Path) -> str:
-    """Just hook-errors.log — the file /remember:doctor actually tails."""
+    """Just hook-errors.log — the file /memory:doctor actually tails."""
     out = []
     for err_log in tmp_path.rglob("hook-errors.log"):
         out.append(err_log.read_text(encoding="utf-8", errors="replace"))

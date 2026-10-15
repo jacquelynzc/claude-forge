@@ -63,7 +63,7 @@
 #       across every hook on the event, and the preamble alone was measured
 #       past that on a slow Windows machine (#560). A failed flush is reported loudly
 #       once that subshell finishes (report_error(), which reaches both the
-#       daily log and hook-errors.log — surfaced by /remember:doctor) rather
+#       daily log and hook-errors.log — surfaced by /memory:doctor) rather
 #       than swallowed silently: the other hooks in this plugin can afford
 #       silence on failure because there is always a next tool call or a
 #       next session to retry from. This one is the last chance a session
@@ -319,7 +319,7 @@ log "hook" "session-end: reason=$SESSION_END_REASON session=${STDIN_SESSION_ID:-
 # time this line runs, the process running it is the detached child, on
 # no budget at all. The two changes are one fix -- the detach makes this
 # line reachable on that machine, and this line is what makes the result
-# visible to /remember:doctor.
+# visible to /memory:doctor.
 # Checked and reported (#503): this mkdir is best-effort defensive
 # re-creation on top of bootstrap-dirs.sh's own earlier attempt, and a
 # failure here means the seed write two lines down cannot land either --
@@ -331,7 +331,7 @@ log "hook" "session-end: reason=$SESSION_END_REASON session=${STDIN_SESSION_ID:-
 # reports its own fall-through, so a read-only store or a full disk shows
 # up as a fault rather than as silence.
 if ! mkdir -p "$REMEMBER_DIR/logs/autonomous" 2>/dev/null; then
-    report_error "session-end" "WARNING: could not create $REMEMBER_DIR/logs/autonomous -- this session's flush will not be recorded, and /remember:doctor may misreport SessionEnd as never having fired."
+    report_error "session-end" "WARNING: could not create $REMEMBER_DIR/logs/autonomous -- this session's flush will not be recorded, and /memory:doctor may misreport SessionEnd as never having fired."
 fi
 # `$$` (this hook process's own PID) suffixes the second-granularity
 # timestamp so two SessionEnd hooks for the same project, ending inside the
@@ -377,7 +377,7 @@ _END_LOG="$REMEMBER_DIR/logs/autonomous/session-end-$(_remember_date +%H%M%S)-$$
 # that never fired at all. Reported the same way save-session.sh:428
 # reports its own fall-through.
 if ! printf '%s [session-end] flush started\n' "$(_remember_date +%H:%M:%S)" >> "$_END_LOG" 2>/dev/null; then
-    report_error "session-end" "WARNING: could not seed $_END_LOG -- if this file stays absent or empty, an ordinary housekeeping sweep will reclaim it, and /remember:doctor may misreport this session as one where SessionEnd never fired."
+    report_error "session-end" "WARNING: could not seed $_END_LOG -- if this file stays absent or empty, an ordinary housekeeping sweep will reclaim it, and /memory:doctor may misreport this session as one where SessionEnd never fired."
 fi
 
 # bootstrap-dirs.sh's mkdir is best-effort, and by the time this line runs it
@@ -421,7 +421,7 @@ fi
 # ("a listener blocked in a foreground child leaks that child when the
 # script is killed" — the shape this rewrite avoids). The trade is explicit:
 # this hook can no longer report a flush failure to the SAME invocation of
-# `/remember:doctor` that ran a second later, only to hook-errors.log once
+# `/memory:doctor` that ran a second later, only to hook-errors.log once
 # the background flush itself finishes — which is what the subshell below
 # does.
 #

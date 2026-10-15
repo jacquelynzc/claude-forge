@@ -1,12 +1,12 @@
 """#842 request 4: when memory_inject_max_bytes is configured BELOW the
 bundled 200000 default, the over-cap notice must say "capped by config" and
-must not suggest /remember:doctor.
+must not suggest /memory:doctor.
 
 Before this fix the notice was worded identically whether the cap was the
 bundled default (a store that really is broken -- consolidation wrote an
 unbounded response, see #346) or a cap an operator deliberately lowered on
 purpose (e.g. to stay under #842's own session_start_max_bytes). Both cases
-produced "run /remember:doctor", which is actionable advice for the first
+produced "run /memory:doctor", which is actionable advice for the first
 case and noise for the second.
 """
 
@@ -89,8 +89,8 @@ class TestCapBelowBundledDefaultIsWordedAsConfig:
 
     def test_lowered_cap_does_not_recommend_doctor(self, tmp_path):
         out, _ = _run(tmp_path, memory_inject_max_bytes=1000, archive_bytes=2000)
-        assert "/remember:doctor" not in out, (
-            f"a deliberately lowered cap is not a broken store -- /remember:doctor "
+        assert "/memory:doctor" not in out, (
+            f"a deliberately lowered cap is not a broken store -- /memory:doctor "
             f"has nothing to diagnose here.\noutput tail: {out[-800:]}"
         )
 
@@ -101,7 +101,7 @@ class TestCapAtOrAboveBundledDefaultKeepsTheBrokenStoreWording:
 
     def test_default_cap_still_recommends_doctor(self, tmp_path):
         out, _ = _run(tmp_path, memory_inject_max_bytes=200000, archive_bytes=250000)
-        assert "/remember:doctor" in out, (
+        assert "/memory:doctor" in out, (
             f"the bundled-default cap's own wording regressed.\noutput tail: {out[-800:]}"
         )
         assert "capped by config" not in out.lower(), (
@@ -110,7 +110,7 @@ class TestCapAtOrAboveBundledDefaultKeepsTheBrokenStoreWording:
 
     def test_cap_above_the_bundled_default_also_keeps_the_broken_store_wording(self, tmp_path):
         out, _ = _run(tmp_path, memory_inject_max_bytes=300000, archive_bytes=350000)
-        assert "/remember:doctor" in out, (
+        assert "/memory:doctor" in out, (
             f"a cap set ABOVE the bundled default is not a deliberately "
             f"lowered one either.\noutput tail: {out[-800:]}"
         )
@@ -126,7 +126,7 @@ class TestLoweredCapDoesNotHideAGenuinelyMalformedFile:
 
     def test_file_above_the_bundled_default_keeps_doctor_advice_under_a_lowered_cap(self, tmp_path):
         out, _ = _run(tmp_path, memory_inject_max_bytes=50000, archive_bytes=250000)
-        assert "/remember:doctor" in out, (
+        assert "/memory:doctor" in out, (
             f"a file past the bundled 200000 default is malformed whatever the "
             f"configured cap.\noutput tail: {out[-800:]}"
         )
@@ -138,4 +138,4 @@ class TestLoweredCapDoesNotHideAGenuinelyMalformedFile:
         """Positive control: same lowered cap, a file the cap alone explains."""
         out, _ = _run(tmp_path, memory_inject_max_bytes=50000, archive_bytes=100000)
         assert "capped by config" in out.lower(), f"output tail: {out[-800:]}"
-        assert "/remember:doctor" not in out, f"output tail: {out[-800:]}"
+        assert "/memory:doctor" not in out, f"output tail: {out[-800:]}"

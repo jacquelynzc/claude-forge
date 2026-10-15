@@ -1,5 +1,5 @@
 """#694: a failed background save reported only `exited 1` in hook-errors.log
--- the file /remember:doctor tails and a reporter is asked to paste -- while
+-- the file /memory:doctor tails and a reporter is asked to paste -- while
 the real cause (auth expired, balance exhausted, rate limited, whatever the
 nested `claude` CLI actually said) went only to the daily narrative log,
 which nobody reads while diagnosing a live outage.

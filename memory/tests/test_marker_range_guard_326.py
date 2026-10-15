@@ -165,7 +165,7 @@ def test_a_future_dated_save_marker_is_reset_to_a_usable_value(tmp_path):
 def test_a_future_dated_save_marker_says_so(tmp_path):
     """A silent clamp trades a mute stuck throttle for a mute wrong value.
 
-    hook-errors.log, not just the daily log: /remember:doctor reports 'Recent
+    hook-errors.log, not just the daily log: /memory:doctor reports 'Recent
     errors' out of it (#252/#260/#266), and a clock that stepped backwards far
     enough to disable saving is exactly what a user pastes that file to find.
     """

@@ -7,7 +7,7 @@ consolidation): every one of those leaves the same kind of span landing here
 every round, forever, in a file that is genuinely append-only. Nothing in the
 tree noticed. This does not cap or truncate anything -- it makes the
 crossing visible once, via report_error() (daily log + hook-errors.log,
-surfaced by /remember:doctor).
+surfaced by /memory:doctor).
 
 Driven directly against a small standalone bash script that sources the real
 scripts/lib-staging-lock.sh (and its own dependencies) rather than through

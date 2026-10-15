@@ -11,7 +11,7 @@ tells the relaying assistant to quote back verbatim and never contradict.
 
 ``last-save.json`` is store-derived, not attacker-authored code, but it is
 committable into a project's ``.remember/tmp/`` directory, so a victim who
-clones a repository carrying a poisoned file and runs ``/remember:doctor``
+clones a repository carrying a poisoned file and runs ``/memory:doctor``
 would have the forged line relayed as the tool's own conclusion.
 
 Paired with the positive control every negative assertion here needs: a

@@ -287,6 +287,6 @@ _remember_case_compose_message() {
         fi
     fi
 
-    REMEMBER_CASE_MESSAGE="remember: ${_lead} -- spellings that differ only in case. Harmless on this case-insensitive filesystem, so nothing to fix today; restored onto a case-sensitive one they become separate directories and this plugin would use only ${REMEMBER_CASE_RESOLVED}. Nothing will be renamed or merged for you -- check which spellings your backup's HEAD holds before such a restore. /remember:doctor shows this again."
+    REMEMBER_CASE_MESSAGE="remember: ${_lead} -- spellings that differ only in case. Harmless on this case-insensitive filesystem, so nothing to fix today; restored onto a case-sensitive one they become separate directories and this plugin would use only ${REMEMBER_CASE_RESOLVED}. Nothing will be renamed or merged for you -- check which spellings your backup's HEAD holds before such a restore. /memory:doctor shows this again."
     return 0
 }

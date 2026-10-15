@@ -1,8 +1,8 @@
-# Diagnostics (`/remember:doctor`)
+# Diagnostics (`/memory:doctor`)
 
 Prints resolved paths, detected tools, storage mode, whether the session directory Claude Code actually created matches the slug the plugin computes, when the last successful save happened, whether `PostToolUse` has ever fired for this project, and whether `SessionEnd` -- the last-chance flush -- has ever fired ([#370](https://github.com/Digital-Process-Tools/claude-remember/issues/370)). Each line is prefixed `OK` / `WARN` / `FAIL`, ending in a one-line verdict.
 
-In external storage mode it also warns (`WARN Legacy store:`) when the project's old in-project `.remember/` still holds memory files (`now.md`, `recent.md`, `archive.md`, `core-memories.md`, `remember.md`). Since [#898](https://github.com/Digital-Process-Tools/claude-remember/issues/898) nothing moves those into the external store automatically; session start prints one `remember: ... move it by hand (see /remember:doctor)` line the first time, and this warning stays until you move the files yourself (see [external-storage-mode.md](external-storage-mode.md)).
+In external storage mode it also warns (`WARN Legacy store:`) when the project's old in-project `.remember/` still holds memory files (`now.md`, `recent.md`, `archive.md`, `core-memories.md`, `remember.md`). Since [#898](https://github.com/Digital-Process-Tools/claude-remember/issues/898) nothing moves those into the external store automatically; session start prints one `remember: ... move it by hand (see /memory:doctor)` line the first time, and this warning stays until you move the files yourself (see [external-storage-mode.md](external-storage-mode.md)).
 
 The `SessionEnd` check only counts a quiet transcript as evidence once it is newer than `.remember/.install-marker`'s own mtime -- written exactly once, the first time any hook bootstraps the store, and never rewritten by ordinary hook activity -- since a transcript quiet since before that moment cannot be proof `SessionEnd` failed to fire: the hook was never registered for it. Installing into (or upgrading in) a project with pre-existing Claude Code history therefore reads correctly as "nothing has had the chance to prove or disprove this yet", not as a false `problem`. This baseline is unavailable, and the check can only `WARN`, never `FAIL`, when the marker itself is missing or unreadable -- which should now only happen in the brief window before a store's first hook invocation writes it; an earlier version of this baseline (`.remember/.gitignore`'s mtime) was deleted, by design, the first time a legacy-to-external migration was backed up with git, permanently degrading the check for that store ([#401](https://github.com/Digital-Process-Tools/claude-remember/issues/401)) -- `.install-marker` is written unconditionally of storage mode and nothing else in this codebase has any reason to touch it again.
 
@@ -47,7 +47,7 @@ Consolidation refuses to build a prompt larger than `thresholds.consolidate_max_
 
 **It now rotates its way out, and nothing is deleted.** Whichever file is measurably the reason the round will not fit is renamed to a dated sibling — `archive-YYYY-MM-DD.md`, `recent-YYYY-MM-DD.md`, with a `-2` suffix if it happens twice in one day — a fresh empty one is started, and consolidation resumes on the next round. The rotated bytes stay on disk, stay greppable, and are named at session start so recall can still reach them.
 
-**Which file moves is decided by arithmetic, not by guessing.** Dropping `archive.md` is tried first; `recent.md` is rotated only when dropping it is what brings the round under the cap. If the past-day staging files are over the cap *on their own*, nothing is rotated at all — no rotation available would change the next round, so moving `recent.md` would split an unconsolidated span for nothing. `/remember:doctor` distinguishes the two: the self-healing shape is a `WARN` that tells you to do nothing, and the shape that needs you is a `FAIL` that reaches the verdict line.
+**Which file moves is decided by arithmetic, not by guessing.** Dropping `archive.md` is tried first; `recent.md` is rotated only when dropping it is what brings the round under the cap. If the past-day staging files are over the cap *on their own*, nothing is rotated at all — no rotation available would change the next round, so moving `recent.md` would split an unconsolidated span for nothing. `/memory:doctor` distinguishes the two: the self-healing shape is a `WARN` that tells you to do nothing, and the shape that needs you is a `FAIL` that reaches the verdict line.
 
 ## Profiling a hook: where your trace goes
 
@@ -88,12 +88,12 @@ including a real template bug the guard is there to catch.
 
 **Recovery**: clear the recorded position for the affected session so the next save starts fresh
 rather than re-reading the poisoned span. `last-save.json` lives at `<store>/tmp/last-save.json`
-(`session_dir_slug`/`/remember:doctor` names `<store>`); removing that file, or deleting just the
+(`session_dir_slug`/`/memory:doctor` names `<store>`); removing that file, or deleting just the
 entry for the stuck session ID, is enough -- nothing else needs to change. The trade-off is that any
 unsummarized content in the span since the last successful save before the stall is not recaptured;
 if that matters, save it manually before clearing the position.
 
 ## SessionStart duration ([#706](https://github.com/Digital-Process-Tools/claude-remember/issues/706))
 
-`/remember:doctor` also reports the most recently recorded `session-start took Ns` line from the daily log — `session-start-hook.sh` writes one on every start, always, whether or not it was slow enough to also show up in the session itself (see `session_start_slow_threshold_s` in [Configuration](configuration.md)). The plugin cannot tell a slow host from a slow plugin and does not try to; it only says how long it took, which is what points a user at the right question to ask next instead of hours of "the memory plugin feels slow" with nothing to check it against.
+`/memory:doctor` also reports the most recently recorded `session-start took Ns` line from the daily log — `session-start-hook.sh` writes one on every start, always, whether or not it was slow enough to also show up in the session itself (see `session_start_slow_threshold_s` in [Configuration](configuration.md)). The plugin cannot tell a slow host from a slow plugin and does not try to; it only says how long it took, which is what points a user at the right question to ask next instead of hours of "the memory plugin feels slow" with nothing to check it against.
 

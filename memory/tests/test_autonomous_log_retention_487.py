@@ -618,7 +618,7 @@ class TestSeedWriteFailureIsReported:
         assert "WARNING" in reported, (
             "a seed write that could never land must be reported -- "
             "otherwise this session's flush silently leaves no on-disk "
-            "trace, and /remember:doctor cannot tell that apart from a "
+            "trace, and /memory:doctor cannot tell that apart from a "
             "hook that never fired at all\n" + reported
         )
 

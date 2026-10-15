@@ -98,7 +98,7 @@ _REMEMBER_LIB_STAGING_LOCK_SOURCED=1
 # log.sh was simply never sourced -- where logs/ is perfectly writable and
 # only the missing `source` line stands between this file and the real
 # functions. Falling straight to stderr in that case too would make the
-# growth warning as invisible to /remember:doctor's "Recent errors" section
+# growth warning as invisible to /memory:doctor's "Recent errors" section
 # as the no-op stub this design explicitly rejects. stderr is still the
 # fallback of last resort, exactly as log.sh's own report_error() falls
 # back to it when logs/ cannot be created at all -- the #361/#372 case.
@@ -122,7 +122,7 @@ declare -F report_error >/dev/null 2>&1 || report_error() {
     # potentially untrusted, error text, and this stub is the fifth writer
     # of hook-errors.log #618 did not cover (only log.sh's four were
     # touched there). Without this, an embedded newline/CR in $2 forges a
-    # second entry in the file /remember:doctor tails and maintainers ask
+    # second entry in the file /memory:doctor tails and maintainers ask
     # reporters to paste.
     local _msg
     _msg="$(printf '%s' "$2" | LC_ALL=C tr '[:cntrl:]' ' ')"
@@ -214,7 +214,7 @@ staging_lock_release() {
 # worse than the growth it is guarding against — so this does not cap
 # anything. It only makes the growth visible once, the same way #180 made
 # a silently-failing NDC call visible: report_error() so it reaches both
-# the daily log and hook-errors.log, surfaced by /remember:doctor, without
+# the daily log and hook-errors.log, surfaced by /memory:doctor, without
 # touching the file's contents at all.
 #
 # Fires once per crossing rather than once per append past the line — the

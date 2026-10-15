@@ -223,7 +223,7 @@ def test_the_check_says_nothing_when_it_cannot_know_which_session_is_ours(tmp_pa
     and the hook cannot tell which it is in.
 
     Silence is the right degradation *for the warning specifically*: a missed
-    gap is still caught by /remember:doctor and by the recovery block, whereas
+    gap is still caught by /memory:doctor and by the recovery block, whereas
     a false one accuses a healthy install and spends the credibility this
     warning needs the one time it is true. It is not silence for free, though —
     see the disclosure test below.

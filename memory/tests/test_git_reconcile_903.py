@@ -160,7 +160,7 @@ class TestTheKillSwitchNoticeRespectsTheFlag:
     git_reconcile.enabled read -- so EVERY save for EVERY installed user
     appended a line to hook-errors.log, including the default-disabled
     majority who never opted into git_reconcile at all. That permanently
-    tripped /remember:doctor's 'Recent errors' WARN. The notice is now read-
+    tripped /memory:doctor's 'Recent errors' WARN. The notice is now read-
     gated: it fires only for someone who actually turned the flag on and is
     now finding it inert."""
 
@@ -1450,7 +1450,7 @@ class TestHardDisabledPending969:
         still write a log entry and a
         hook-errors.log line naming #969 (via report_error(), self-review
         finding: a bare `echo >&2` would be invisible to the only durable
-        surface /remember:doctor reads) -- that notice is the one thing
+        surface /memory:doctor reads) -- that notice is the one thing
         this test asserts DOES happen."""
         home, remember, _remote, slug_dir, project, other_slug_dir = (
             TestScopedAbort()._diverged_with_in_set_foreign_write(tmp_path))
@@ -1487,14 +1487,14 @@ class TestHardDisabledPending969:
         assert "disabled pending #969" in log_text, (
             "the kill switch notice naming #969 must reach the daily log "
             "(report_error(), not a bare echo -- a self-review finding: "
-            "/remember:doctor only ever reads hook-errors.log/the daily "
+            "/memory:doctor only ever reads hook-errors.log/the daily "
             "log, never a hook's own inherited stderr): " + log_text
         )
 
         hook_errors = slug_dir / "logs" / "hook-errors.log"
         assert hook_errors.exists(), (
             "report_error() must also reach hook-errors.log -- the file "
-            "/remember:doctor's own 'Recent errors' section reads"
+            "/memory:doctor's own 'Recent errors' section reads"
         )
         assert "disabled pending #969" in hook_errors.read_text(encoding="utf-8")
 

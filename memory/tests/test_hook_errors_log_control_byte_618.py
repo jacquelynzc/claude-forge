@@ -15,7 +15,7 @@ log():
     report_error                (log.sh, printf to hook-errors.log)
     _dispatch_report_timeout   (log.sh, printf to hook-errors.log)
 
-hook-errors.log is what `/remember:doctor` tails under "Recent errors" and
+hook-errors.log is what `/memory:doctor` tails under "Recent errors" and
 what maintainers ask reporters to paste (#252, #280, #326) -- exactly the
 file #599's own rationale names as the one that matters. A hook name, an
 exit reason, or a "how" string built from something outside this codebase's

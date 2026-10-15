@@ -1462,7 +1462,7 @@ _dispatch_stdout_relay() {
 # Report one failed hook, in both places a human looks.
 #
 # `log()` writes the daily narrative, which is where this failure belongs in
-# sequence. hook-errors.log is where `/remember:doctor` reports "Recent errors"
+# sequence. hook-errors.log is where `/memory:doctor` reports "Recent errors"
 # and what maintainers ask a reporter to paste — #252 is the demonstration that
 # the daily log ALONE is not read, and #260/#266 are the demonstration that
 # hook-errors.log is what gets looked at when something is wrong.
@@ -1497,7 +1497,7 @@ _dispatch_report_failure() {
 # The ownership and world-writable guards below are the reason this is a blast
 # radius rather than a vulnerability — but a refused hook is a hook that never
 # ran and will never run until someone changes its mode or its owner, and until
-# now that fact went only to the daily log. `/remember:doctor` reports "Recent
+# now that fact went only to the daily log. `/memory:doctor` reports "Recent
 # errors" out of hook-errors.log, so it said OK for a store whose backup hook
 # had been silently skipped since it was installed. That is #252's finding
 # reached from another direction: the tool was not quiet, it was reassuring.
@@ -1517,7 +1517,7 @@ _dispatch_report_skip() {
 #
 # The generalisation of the two functions above, for callers that are not
 # dispatch. `log()` alone is not enough and #252 is the demonstration: the daily
-# narrative is not read, and `/remember:doctor` reports "Recent errors" out of
+# narrative is not read, and `/memory:doctor` reports "Recent errors" out of
 # hook-errors.log, which is the file a reporter is asked to paste.
 #
 # Written by PATH rather than by inherited stderr, for the reason
@@ -1551,7 +1551,7 @@ report_error() {
 #
 # Reporting the second in the shape of the first — "hook failed (exit 143)" —
 # invents a verdict the hook never gave, and 143 is not even the hook's exit
-# status, it is the signal WE sent. `/remember:doctor` tails this file under
+# status, it is the signal WE sent. `/memory:doctor` tails this file under
 # "Recent errors", so the difference decides whether it shows a fault or an
 # absence of information. It is loud either way: a listener that hangs is a real
 # problem with a real installation even when its own verdict is unknown.
@@ -2064,7 +2064,7 @@ rotate_logs() {
         > "$state" 2>/dev/null || true
 
     if [ "$streak" -ge "$_ROTATE_ESCALATE_AFTER" ]; then
-        log "rotate" "ERROR: log rotation has now failed ${streak} times in a row -- ${count} aged log files are accumulating unarchived in ${REMEMBER_LOG_DIR} and nothing will clear them until this is fixed. Run /remember:doctor. Last error: ${first_line}"
+        log "rotate" "ERROR: log rotation has now failed ${streak} times in a row -- ${count} aged log files are accumulating unarchived in ${REMEMBER_LOG_DIR} and nothing will clear them until this is fixed. Run /memory:doctor. Last error: ${first_line}"
     else
         log "rotate" "ERROR: tar failed for ${count} logs: ${first_line}"
     fi
