@@ -26,6 +26,7 @@ check ui-craft    https://github.com/educlopez/ui-craft.git
 check caveman     https://github.com/JuliusBrussee/caveman
 check superpowers https://github.com/obra/superpowers.git
 check humanizer   https://github.com/blader/humanizer.git
+check remember    https://github.com/Digital-Process-Tools/claude-remember.git
 
 echo
 echo "Review each diff before applying anything. Update VENDOR.md when you do."
