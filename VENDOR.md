@@ -11,7 +11,7 @@ rather than re-cloned, so the bytes here are the bytes that were in use.
 | superpowers | https://github.com/obra/superpowers.git | 6.1.1 | ~/.claude/plugins/cache/superpowers-dev/superpowers/6.1.1/ |
 | humanizer | https://github.com/blader/humanizer.git | 2.8.2 | ~/.claude/plugins/cache/humanizer/humanizer/2.8.2/ |
 | computer-commander | https://github.com/wonderwhy-er/DesktopCommanderMCP.git | v0.2.52 (tag) | re-cloned from upstream 2026-09-22, updated to v0.2.52 on 2026-10-05 |
-| remember | https://github.com/Digital-Process-Tools/claude-remember.git | v0.43.1 (tag) | re-cloned from upstream 2026-10-15 |
+| memory (remember) | https://github.com/Digital-Process-Tools/claude-remember.git | v0.43.1 (tag) | re-cloned from upstream 2026-10-15 |
 | common-ground | https://github.com/Jeffallan/claude-skills (inspiration only) | 1.0.0 | original adaptation, added 2026-09-27 |
 
 humanizer was verified byte-for-byte against
@@ -391,9 +391,14 @@ because a same-named command would collide with the skill; its
 `argument-hint` moved into the skill frontmatter. State is written outside the
 repo to `~/.claude/common-ground/{project-id}/`.
 
-## remember
+## memory (remember)
 
-Imported 2026-10-15 at upstream tag v0.43.1, verbatim (`.git/` excluded).
+Imported 2026-10-15 at upstream tag v0.43.1, verbatim (`.git/` excluded)
+except for the name. The directory is `memory/` and `.claude-plugin/plugin.json`
+says `"name": "memory"`, because a plugin named `remember` collides with
+`remember@claude-plugins-official`. Skills are therefore `/memory:remember`
+and `/memory:doctor`. Upstream's own messages still say `/remember:doctor`, and
+the `.codex-plugin`/`.gemini` manifests were left as upstream ships them.
 
 The 0.33.0 install carried one local patch to `skills/remember/SKILL.md`: with
 no `=== HANDOFF ===` block in context, resolve the handoff path from
