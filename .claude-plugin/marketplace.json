@@ -1,8 +1,8 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "claude-forge",
-  "version": "1.11.2",
-  "description": "Local-only forks of ui-craft, caveman, superpowers, humanizer, and computer-commander, plus common-ground",
+  "version": "1.12.0",
+  "description": "Local-only forks of ui-craft, caveman, superpowers, humanizer, computer-commander, and remember, plus common-ground",
   "owner": {
     "name": "rude"
   },
@@ -36,6 +36,11 @@
       "name": "common-ground",
       "source": "./common-ground",
       "description": "Assumption ledger, decision history, and Mermaid reasoning map for the current project. Standalone adaptation of Common Ground from Jeffallan/claude-skills."
+    },
+    {
+      "name": "remember",
+      "source": "./remember",
+      "description": "Continuous memory for Claude Code: tiered daily logs and session handoffs. Fork of claude-remember 0.33.0 with the /remember handoff path resolved to the main checkout from inside git worktrees."
     }
   ]
 }

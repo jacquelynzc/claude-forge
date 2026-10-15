@@ -11,6 +11,7 @@ rather than re-cloned, so the bytes here are the bytes that were in use.
 | superpowers | https://github.com/obra/superpowers.git | 6.1.1 | ~/.claude/plugins/cache/superpowers-dev/superpowers/6.1.1/ |
 | humanizer | https://github.com/blader/humanizer.git | 2.8.2 | ~/.claude/plugins/cache/humanizer/humanizer/2.8.2/ |
 | computer-commander | https://github.com/wonderwhy-er/DesktopCommanderMCP.git | v0.2.52 (tag) | re-cloned from upstream 2026-09-22, updated to v0.2.52 on 2026-10-05 |
+| remember | https://github.com/Digital-Process-Tools/claude-remember.git | 0.33.0 (tag v0.33.0) + local patch | ~/.claude/plugins/cache/claude-plugins-official/remember/0.33.0/, imported 2026-10-15 |
 | common-ground | https://github.com/Jeffallan/claude-skills (inspiration only) | 1.0.0 | original adaptation, added 2026-09-27 |
 
 humanizer was verified byte-for-byte against
@@ -389,3 +390,20 @@ Packaged as a plugin: `SKILL.md` and `references/` moved under
 because a same-named command would collide with the skill; its
 `argument-hint` moved into the skill frontmatter. State is written outside the
 repo to `~/.claude/common-ground/{project-id}/`.
+
+## remember
+
+Imported 2026-10-15 from the running install in the plugin cache. The tree
+matches upstream tag v0.33.0 byte for byte except one local patch, kept here
+so a plugin update does not overwrite it:
+
+- `skills/remember/SKILL.md`: when no `=== HANDOFF ===` block is in context,
+  the handoff path is resolved with
+  `$(cd "$(git rev-parse --git-common-dir)/.." && pwd)/.remember/remember.md`
+  instead of `{project_root}/.remember/remember.md`. Inside a git worktree the
+  old fallback wrote the handoff into the worktree, where the next session
+  never reads it.
+
+Upstream is at v0.43.1 as of import and still has the old fallback, so the
+patch must be re-applied when updating. `.in_use/`, `__pycache__/` and
+`.pytest_cache/` were excluded from the copy.
