@@ -40,7 +40,7 @@
     {
       "name": "remember",
       "source": "./remember",
-      "description": "Continuous memory for Claude Code: tiered daily logs and session handoffs. Fork of claude-remember 0.33.0 with the /remember handoff path resolved to the main checkout from inside git worktrees."
+      "description": "Continuous memory for Claude Code: tiered daily logs and session handoffs. Fork of claude-remember 0.43.1."
     }
   ]
 }

@@ -11,7 +11,7 @@ rather than re-cloned, so the bytes here are the bytes that were in use.
 | superpowers | https://github.com/obra/superpowers.git | 6.1.1 | ~/.claude/plugins/cache/superpowers-dev/superpowers/6.1.1/ |
 | humanizer | https://github.com/blader/humanizer.git | 2.8.2 | ~/.claude/plugins/cache/humanizer/humanizer/2.8.2/ |
 | computer-commander | https://github.com/wonderwhy-er/DesktopCommanderMCP.git | v0.2.52 (tag) | re-cloned from upstream 2026-09-22, updated to v0.2.52 on 2026-10-05 |
-| remember | https://github.com/Digital-Process-Tools/claude-remember.git | 0.33.0 (tag v0.33.0) + local patch | ~/.claude/plugins/cache/claude-plugins-official/remember/0.33.0/, imported 2026-10-15 |
+| remember | https://github.com/Digital-Process-Tools/claude-remember.git | v0.43.1 (tag) | re-cloned from upstream 2026-10-15 |
 | common-ground | https://github.com/Jeffallan/claude-skills (inspiration only) | 1.0.0 | original adaptation, added 2026-09-27 |
 
 humanizer was verified byte-for-byte against
@@ -393,17 +393,18 @@ repo to `~/.claude/common-ground/{project-id}/`.
 
 ## remember
 
-Imported 2026-10-15 from the running install in the plugin cache. The tree
-matches upstream tag v0.33.0 byte for byte except one local patch, kept here
-so a plugin update does not overwrite it:
+Imported 2026-10-15 at upstream tag v0.43.1, verbatim (`.git/` excluded).
 
-- `skills/remember/SKILL.md`: when no `=== HANDOFF ===` block is in context,
-  the handoff path is resolved with
-  `$(cd "$(git rev-parse --git-common-dir)/.." && pwd)/.remember/remember.md`
-  instead of `{project_root}/.remember/remember.md`. Inside a git worktree the
-  old fallback wrote the handoff into the worktree, where the next session
-  never reads it.
+The 0.33.0 install carried one local patch to `skills/remember/SKILL.md`: with
+no `=== HANDOFF ===` block in context, resolve the handoff path from
+`git rev-parse --git-common-dir` so a session in a git worktree writes to the
+main checkout's `.remember/` instead of a stray one in the worktree.
 
-Upstream is at v0.43.1 as of import and still has the old fallback, so the
-patch must be re-applied when updating. `.in_use/`, `__pycache__/` and
-`.pytest_cache/` were excluded from the copy.
+It is not re-applied. Since 0.34.0 the skill no longer picks a path at all; it
+pipes the note to `scripts/write-handoff.sh`, which resolves `REMEMBER_DIR`
+through `_resolve_memory_project_dir` in `scripts/lib-memory-dir.sh`, and that
+already redirects linked worktrees to the main checkout. Checked from this
+repo's worktree `.claude/worktrees/common-ground-implementation-0908ee`: it
+resolves to `/Users/rude/dev/claude-forge/.remember`. Upstream dropped the
+context-block path on purpose (a forged block could aim the write at any file),
+so putting the old instruction back would undo that fix.

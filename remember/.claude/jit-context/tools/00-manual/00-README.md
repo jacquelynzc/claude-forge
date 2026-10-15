@@ -15,11 +15,33 @@ hits them. They are filed upstream and should be deleted here once they ship in 
 - `tree-snapshot-compare.md` → [claude-oss#1105](https://github.com/Digital-Process-Tools/claude-oss/issues/1105)
 - `release-publish-denied.md` → [claude-oss#1106](https://github.com/Digital-Process-Tools/claude-oss/issues/1106)
 - `supertool-literal-backslashes.md` → [claude-supertool#2327](https://github.com/Digital-Process-Tools/claude-supertool/issues/2327)
+- `raw-append-write-unguarded.md` → [claude-supertool#2699](https://github.com/Digital-Process-Tools/claude-supertool/issues/2699)
 
 ## Declined traps
 
 The rule builder skips this file by name, so an absence recorded here reads as a decision rather
 than an oversight.
+
+- **`705.edit-toml-literal-double-escape`** -- declined 2026-09-28 as a new rule: already
+  promoted. `supertool-literal-backslashes.md` in this same layer already documents exactly this
+  incident by number (#705) -- an embedded literal double quote needing \" written through
+  `edit:@-`'s TOML payload with `literal_backslashes = true`, and the fix (use a single-quoted
+  Python string literal instead of juggling the backslash count). This fragment is a duplicate
+  record of an already-shipped rule, not a new lesson.
+- **`705.supertool-cwd-default-wrong-tree`** -- declined 2026-09-28 as a new rule: already
+  promoted as `supertool-cwd-verify-tree.md` in this same layer, which documents this exact
+  incident (#705) -- supertool's default cwd silently resolving against the main clone instead of
+  the lane's own worktree. Duplicate record, not a new lesson.
+- **`706.raw-append-write-unguarded`** -- declined 2026-09-28 as a new rule: already promoted as
+  `raw-append-write-unguarded.md` in this same layer, which documents this exact incident and is
+  filed upstream as
+  [claude-supertool#2699](https://github.com/Digital-Process-Tools/claude-supertool/issues/2699).
+  Duplicate record, not a new lesson.
+- **`819.exclusion-cap-give-up-indistinguishable-from-no-previous-session`** -- declined
+  2026-09-28. Already fixed: `scripts/session-start-hook.sh`'s `previous_transcript()` and
+  `_second_newest_jsonl()` both now log a WARNING on the cap-hit give-up branch (`#823`), naming
+  the exclusion count and that a real previous session may exist beyond the cap -- exactly the
+  auditor's suggested fix. Checked against HEAD (2026-09-28).
 
 - **`487.ostype-immutable-on-windows-gitbash`** — declined 2026-09-05. `$OSTYPE` could not be
   forced away from its real value inside bash under real Windows Git Bash: neither
@@ -32,3 +54,22 @@ than an oversight.
   firing on every Windows-conditional bash test would restate a skip that is already there.
   **Reopen this if someone tries the same override a second time** — a repeat would mean the skip
   is not visible enough, and that is a different finding from the one declined here.
+
+- **`722.edit-tool-cannot-write-raw-unicode-literal`** — declined 2026-09-25. A literal
+  zero-width-space character written through `edit:@-`'s TOML payload landed on disk, then
+  ruff's PLE2515 correctly flagged it (a legitimate lint, not a supertool bug) — costing one
+  round-trip until the escape-sequence text (`\u200b`) was written instead of the literal
+  character. Declined as a rule: this is not a code defect (nothing in this repo needs fixing),
+  and the workaround is a single, already-obvious habit ("write the escape sequence text, not
+  the invisible character") not worth injecting into every `edit:@-` call — most payloads never
+  carry an invisible/ambiguous unicode character at all.
+- **`725.recon-reads-dirty-sibling-clone-not-origin-main`** — declined 2026-09-25 as a rule in
+  *this* repository: the defect is in `oss:recon` (agents/recon.md, Digital-Process-Tools/
+  claude-oss), which has no instruction pinning its reads to `origin/<default-branch>` rather
+  than whatever tree its own invoking process's cwd resolves to — still true as of claude-oss
+  0.42.0, confirmed by reading `agents/recon.md` directly. Not this repository's code to fix, and
+  not a lesson a rule injected into *this* repo's own sessions would ever reach (recon runs as
+  its own spawn, elsewhere). **Filed as
+  [claude-oss#1745](https://github.com/Digital-Process-Tools/claude-oss/issues/1745) instead,**
+  naming `commands/run/curate.md`'s own worktree-first fix (#1670) for the identical class as
+  the template recon could adopt.

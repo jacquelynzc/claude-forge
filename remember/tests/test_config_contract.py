@@ -75,8 +75,23 @@ def _source_files() -> list[Path]:
 def _keys_read_by_the_code() -> set[str]:
     keys = set()
     for path in _source_files():
-        keys |= set(_CONFIG_CALL.findall(path.read_text(encoding="utf-8")))
+        text = path.read_text(encoding="utf-8")
+        keys |= set(_CONFIG_CALL.findall(text))
     return keys
+
+
+@pytest.mark.parametrize("key", ["haiku.strip_session_env", "haiku.codex_env_allow"])
+def test_the_env_name_lists_are_no_longer_config(key):
+    """#898 round 17: both environment-name lists are literal code again, so
+    neither key is documented, shipped in the example, or read. Positive
+    control: the table and the example are really parsed (data_dir and
+    thresholds.consolidate_max_bytes are found)."""
+    documented = _keys_documented_in_readme()
+    shipped = _example_keys()
+    assert "data_dir" in documented and "thresholds.consolidate_max_bytes" in shipped
+    assert key not in documented
+    assert key not in shipped
+    assert key not in _keys_read_by_the_code()
 
 
 def _keys_documented_in_readme() -> set[str]:

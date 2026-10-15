@@ -50,6 +50,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from tests._compiled_hooks import is_compiled_text
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 # Every shipped shell script. tests/ is excluded: a test's own ranges never
@@ -78,11 +80,18 @@ _INLINE_LC = re.compile(r"\bLC_ALL=C\b")
 
 
 def _shell_files() -> list[Path]:
+    """Every shipped shell SOURCE file. A hook compiled in place (#900's
+    compiled CI leg) is a build product of files this list already holds --
+    the hook's own source is scanned by the plain pytest job, and every
+    library inlined into it is scanned here as itself -- so it is left out
+    rather than re-scanned with its libraries' lines at shifted numbers."""
     files: list[Path] = []
     for d in SHELL_DIRS:
         root = REPO_ROOT / d
         if root.is_dir():
-            files.extend(sorted(p for p in root.rglob("*.sh") if p.is_file()))
+            files.extend(sorted(
+                p for p in root.rglob("*.sh")
+                if p.is_file() and not is_compiled_text(p.read_text(encoding="utf-8"))))
     return files
 
 
@@ -149,47 +158,91 @@ def _is_protected(text: str, line_no: int, line: str) -> bool:
     return False
 
 
-# `case` patterns compare bytes -- measured, see the module docstring. Left
+# Glob patterns compare bytes -- measured, see the module docstring. Left
 # where they are rather than restructured into a shared helper: these guards
 # have to run at the point of entry, and three of the four hooks holding one
 # have sourced no shared library by then, so reaching a helper would mean
 # moving the guard, and the guard's position is the guarantee.
+#
+# #898 round 19: these sites were `case` patterns; every shipped `case` is now
+# a `[ ]` test over a parameter expansion (`[ "${x#*[!A-Za-z0-9._-]}" != "$x" ]`)
+# because the directory's scanner mis-parses `case`. The pattern after `#` is
+# matched by the same bash glob matcher a `case` pattern was, the one #698's
+# matrix measured as byte-wise for `case` and for `${v//[!...]/}` alike; the
+# old and new forms are compared under C and a UTF-8 locale in
+# tests/test_case_rewrite_equivalence_898.py.
 _CASE = (
-    "a `case` pattern. Measured under tr_TR on glibc / bash 5.2: `case` "
-    "ranges compare bytes and do not move with the locale in either "
+    "a glob pattern in a parameter expansion (a `case` pattern before #898 "
+    "round 19). Measured under tr_TR on glibc / bash 5.2: bash's glob "
+    "matcher compares bytes and does not move with the locale in either "
     "direction (#698's matrix). Only `[[ =~ ]]` collates."
 )
 
 # Sites that are correct as they stand. A bare path is not accepted: every
 # exemption is argued once, in writing, where the next reader can weigh it.
 ALLOWLIST: dict[tuple[str, int], str] = {
-    ("scripts/log.sh", 149):
-        "inside _REMEMBER_CFG_FLATTEN_JQ, a jq program string. jq matches "
-        "with Oniguruma, which is not driven by the shell's LC_COLLATE.",
-    ("scripts/log.sh", 175):
-        "inside the embedded Python fallback. Python's `re` over `str` "
-        "matches [A-Za-z0-9_] as ASCII regardless of locale.",
-    ("scripts/log.sh", 178):
-        "the same Python fallback's own message text, not a pattern.",
-    ("scripts/lib-slug.sh", 71):
+    # Line numbers re-derived in #898 round 19, when every `case` statement
+    # in shipped shell became an if/elif ladder (the ranges are unchanged).
+    # #898 round 7: the inline jq program and the inline Python fallback in
+    # log.sh's config() flattener moved to scripts/cfg_flatten.jq and
+    # scripts/cfg_flatten.py, so neither range needs an exemption here.
+    # Shifted +4 by #913's two stale-comment fixes above this array (no new
+    # bracket range added -- same pre-existing allowlisted entry).
+    ("scripts/lib-slug.sh", 94):
         "a member of the _REMEMBER_SLUG_SED array, only ever invoked as "
-        "`LC_ALL=C sed` (lib-slug.sh:373). The locale is forced at the call "
+        "`LC_ALL=C sed`. The locale is forced at the call "
         "site, which this scanner cannot see from the definition; "
-        "lib-slug.sh:131-150 documents the whole decision.",
+        "lib-slug.sh's own comment above the array documents the whole decision.",
 
-    # --- `case` patterns: measured not to collate (see the module docstring
+    # --- glob patterns: measured not to collate (see the module docstring
     # for the matrix and the run it came from). Listed rather than excluded
     # from the scan, so that one libc's behaviour stays visible and can be
     # re-checked rather than quietly assumed forever.
-    ("scripts/agy-stop-hook.sh", 158): _CASE,
-    ("scripts/post-tool-hook.sh", 424): _CASE,
-    ("scripts/post-tool-hook.sh", 616): _CASE,
-    ("scripts/post-tool-hook.sh", 658): _CASE,
-    ("scripts/post-tool-hook.sh", 712): _CASE,
-    ("scripts/session-end-hook.sh", 193): _CASE,
+    ("scripts/agy-stop-hook.sh", 159): _CASE,
+    ("scripts/post-tool-hook.sh", 453): _CASE,
+    # Lines shifted by #913's SESSION_DIR cache sidecar, inserted above
+    # these three (session-dir-cache does not touch SESSION_ID or add a new
+    # bracket range of its own -- these are the same three pre-existing
+    # allowlisted ranges, re-pinned to where they now live). Shifted +3 again
+    # by #973's rewrite of that same cache's keying comment block, and again
+    # by #913's own incremental-scan rewrite (the cooldown block moved ahead
+    # of these three, and a fourth, equally ASCII-only range -- the new
+    # transcript-scan sidecar's own basename sanitiser -- was added between
+    # the first two). Re-pinned again after the #1013 rebase's own self-review
+    # fix. Shifted again by #1011's fork-reduction fix (the forkless
+    # transcript-lookup glob-walk, plus its same-second mtime-tie comment
+    # block, landed above the first two; the capture-alive skip-when-
+    # unchanged rewrite landed between the first and the other two), and once
+    # more by #1011's own self-review round (a stale-comment fix above the
+    # glob-walk, plus a longer comment on the capture-alive in-place write).
+    ("scripts/post-tool-hook.sh", 771): _CASE,
+    ("scripts/post-tool-hook.sh", 814): _CASE,
+    # The #913 transcript-scan sidecar's own key: a filename component, same
+    # [A-Za-z0-9._-]+ charset as SESSION_ID right above, never locale text --
+    # measured the same way, same reason. Shifted +27 (957->984, 1059->1086)
+    # by #1017's comment block replacing the quadratic newline count in
+    # _pt_scan_lines with a linear `wc -l`, and by #1019's comment block
+    # forcing the empty-SESSION_ID capture-alive write onto the atomic
+    # branch -- neither touches this range or adds a new one of its own.
+    # Shifted +5, then +7, then +4 more (984->989->996->1001,
+    # 1086->1091->1099->1103) by #1011 round 2's fork reduction and its own
+    # self-review follow-ups: two added lines (globals set before
+    # _pt_scan_lines), a net +3 inside the function (the pipe-based wc -l
+    # replaced by a herestring, wrapped in an `if` that skips the fork
+    # entirely when there is no complete line to count), +7 for
+    # `_remember_date_into` replacing `$(_remember_date +%s)` in the
+    # cooldown-elapsed check above this range (the same avoidable-subshell
+    # class this whole round exists to remove), and +4 for the comment
+    # above `_nl_count` that now describes the herestring instead of the
+    # pipe it replaced.
+    ("scripts/post-tool-hook.sh", 1005): _CASE,
+    ("scripts/post-tool-hook.sh", 1107): _CASE,
     ("scripts/session-end-hook.sh", 201): _CASE,
-    ("scripts/session-start-hook.sh", 257): _CASE,
-    ("scripts/lib-slug.sh", 406): _CASE,
+    ("scripts/session-end-hook.sh", 209): _CASE,
+    ("scripts/session-start-hook.sh", 289): _CASE,
+    ("scripts/write-handoff.sh", 87): _CASE,
+    ("scripts/doctor.sh", 70): _CASE,
+    ("scripts/lib-slug.sh", 437): _CASE,
 }
 
 
@@ -304,6 +357,9 @@ def test_every_allowlist_entry_still_points_at_a_range():
     for (rel, line_no), reason in ALLOWLIST.items():
         path = REPO_ROOT / rel
         assert path.is_file(), f"allowlisted file is gone: {rel}"
+        if is_compiled_text(path.read_text(encoding="utf-8")):
+            # Line pins name SOURCE lines; see _shell_files.
+            continue
         lines = path.read_text(encoding="utf-8").splitlines()
         assert line_no <= len(lines), f"{rel}:{line_no} is past end of file"
         assert _RANGE.search(lines[line_no - 1]), (

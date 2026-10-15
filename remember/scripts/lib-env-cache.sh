@@ -48,6 +48,13 @@
 #   layer that is still absent cannot have changed. Creating one makes it newer
 #   than the cache, so the cache loses.
 #
+#   #843: `-nt` alone cannot see a layer that EXISTED at publish time and was
+#   since DELETED -- deleting a file changes no mtime a `-nt` check looks at,
+#   so that case would otherwise read as "fresh" forever. Each `CACHE_CONFIG`
+#   value therefore carries a `1:`/`0:` prefix recording whether that layer
+#   existed at publish time, and the loader rejects the cache outright if
+#   today's existence does not match, regardless of what `-nt` says.
+#
 #   Not covered: a project that becomes (or stops being) a linked git worktree
 #   while a cache is live, which would move REMEMBER_DIR. SessionStart
 #   republishes unconditionally, so the window is one session.
@@ -68,7 +75,7 @@
 [ -n "${_REMEMBER_LIB_ENV_CACHE_LOADED:-}" ] && return 0
 _REMEMBER_LIB_ENV_CACHE_LOADED=1
 
-# Sets _REMEMBER_ENV_CACHE_FILE and _REMEMBER_ENV_CACHE_KEY. Returns 1 when
+# Sets _REMEMBER_ENV_CACHE_FILE and _REMEMBER_ENV_CACHE_PROJECT_DIR. Returns 1 when
 # there is no project to key on.
 #
 # Keyed on the RAW CLAUDE_PROJECT_DIR when it is set, falling back to
@@ -113,42 +120,40 @@ _REMEMBER_LIB_ENV_CACHE_LOADED=1
 # more than this); lib-env-cache.sh's copy exists specifically because this
 # one runs on the hot path, so it gets the `_into` treatment from the start.
 _remember_env_cache_normalize_into() {
-    local LC_ALL=C  # bracket ranges below are byte-wise, not collated (#695)
+    # bracket ranges below are byte-wise, not collated (#695)
+    local LC_ALL=C
     local _var="$1" _in="$2" _drive="" _rest=""
     local _re='^([a-zA-Z]):[/\](.*)$'
-    case "$OSTYPE" in
-        msys|cygwin)
-            if [[ "$_in" =~ ^/cygdrive/([a-zA-Z])/(.*)$ ]]; then
-                _drive="${BASH_REMATCH[1]}"
-                _rest="${BASH_REMATCH[2]}"
-            elif [[ "$_in" =~ ^/([a-zA-Z])/(.*)$ ]]; then
-                _drive="${BASH_REMATCH[1]}"
-                _rest="${BASH_REMATCH[2]}"
-            elif [[ "$_in" =~ $_re ]]; then
-                _drive="${BASH_REMATCH[1]}"
-                _rest="${BASH_REMATCH[2]}"
-            fi
-            if [ -n "$_drive" ]; then
-                # `LC_ALL=C` on the command, not just the function's `local`:
-                # `local` on a name the environment never exported leaves it
-                # unexported, so the child keeps the caller's locale. On a host
-                # whose language is set through LANG alone -- what setting a
-                # system language actually produces -- Turkish case rules then
-                # map `i` to the dotted `İ`, two bytes in a slot that holds one
-                # ASCII drive letter. The `local` above still does its own job:
-                # the bracket ranges bash matches itself (#695).
-                _drive=$(printf '%s' "$_drive" | LC_ALL=C tr '[:lower:]' '[:upper:]')
-                _rest="${_rest//\//\\}"
-                printf -v "$_var" '%s:\\%s' "$_drive" "$_rest"
-                return 0
-            fi
-            ;;
-    esac
+    if [ "$OSTYPE" = msys ] || [ "$OSTYPE" = cygwin ]; then
+        # First match wins and fills BASH_REMATCH: Cygwin's mount prefix
+        # first (/cygdrive/c/... cannot match the MSYS form, "cygdrive" is
+        # not one character), then MSYS /c/..., then C:\ or C:/.
+        if [[ "$_in" =~ ^/cygdrive/([a-zA-Z])/(.*)$ ]] || [[ "$_in" =~ ^/([a-zA-Z])/(.*)$ ]] \
+            || [[ "$_in" =~ $_re ]]; then
+            _drive="${BASH_REMATCH[1]}"
+            _rest="${BASH_REMATCH[2]}"
+        fi
+        if [ -n "$_drive" ]; then
+            # `LC_ALL=C` on the command, not just the function's `local`:
+            # `local` on a name the environment never exported leaves it
+            # unexported, so the child keeps the caller's locale. On a host
+            # whose language is set through LANG alone -- what setting a
+            # system language actually produces -- Turkish case rules then
+            # map `i` to the dotted `İ`, two bytes in a slot that holds one
+            # ASCII drive letter. The `local` above still does its own job:
+            # the bracket ranges bash matches itself (#695).
+            _drive=$(printf '%s' "$_drive" | LC_ALL=C tr '[:lower:]' '[:upper:]')
+            _rest="${_rest//\//\\}"
+            printf -v "$_var" '%s:\\%s' "$_drive" "$_rest"
+            return 0
+        fi
+    fi
     printf -v "$_var" '%s' "$_in"
 }
 
 _remember_env_cache_path() {
-    local LC_ALL=C  # bracket ranges below are byte-wise, not collated (#695)
+    # bracket ranges below are byte-wise, not collated (#695)
+    local LC_ALL=C
     # Pinned once per process (#469): this function runs both BEFORE
     # resolve-paths.sh (from _remember_env_cache_load, when CLAUDE_PROJECT_DIR
     # is still unset on Codex -- and on any other host that genuinely never
@@ -166,29 +171,30 @@ _remember_env_cache_path() {
     # exactly the #469 symptom relocated to Windows. resolve-paths.sh only
     # resolves once per hook invocation, so once a key is known in THIS
     # process it is reused rather than asked of the environment again.
-    if [ -n "${_REMEMBER_ENV_CACHE_KEY:-}" ]; then
+    if [ -n "${_REMEMBER_ENV_CACHE_PROJECT_DIR:-}" ]; then
         return 0
     fi
-    local _key="${CLAUDE_PROJECT_DIR:-${REMEMBER_HOOK_CWD:-}}"
-    [ -n "$_key" ] || return 1
+    local _slug="${CLAUDE_PROJECT_DIR:-}"
+    [ -n "$_slug" ] || _slug="${REMEMBER_HOOK_CWD:-}"
+    [ -n "$_slug" ] || return 1
     # #504: normalise BEFORE pinning, so a raw (pre-resolve-paths.sh) and an
     # already-normalised (post-resolve-paths.sh) spelling of the same project
     # collapse to the same key. Idempotent on an already-normalised string --
     # the drive-letter regex matches a backslash-separated input just as
     # readily as a forward-slash one, and re-uppercasing an already-uppercase
-    # drive letter is a no-op. `_into` (writes `_key` directly via
-    # `printf -v`), not `_key=$(_remember_env_cache_normalize "$_key")` --
+    # drive letter is a no-op. `_into` (writes `_slug` directly via
+    # `printf -v`), not `_slug=$(_remember_env_cache_normalize "$_slug")` --
     # see the comment above the function for why that distinction matters
     # here specifically.
-    _remember_env_cache_normalize_into _key "$_key"
-    _REMEMBER_ENV_CACHE_KEY="$_key"
-    _key="${_key//[!a-zA-Z0-9]/-}"
+    _remember_env_cache_normalize_into _slug "$_slug"
+    _REMEMBER_ENV_CACHE_PROJECT_DIR="$_slug"
+    _slug="${_slug//[!a-zA-Z0-9]/-}"
     # Filename length limits are real (255 bytes on most filesystems) and a deep
     # project path exceeds them. Keep the TAIL: the end of a path is what
     # distinguishes it from its siblings, and a collision only ever costs a
     # rejected cache, because the full path is stored inside and compared.
-    [ "${#_key}" -gt 120 ] && _key="${_key: -120}"
-    _REMEMBER_ENV_CACHE_FILE="${TMPDIR:-/tmp}/remember-env-${_key}"
+    [ "${#_slug}" -gt 120 ] && _slug="${_slug: -120}"
+    _REMEMBER_ENV_CACHE_FILE="${TMPDIR:-/tmp}/remember-env-${_slug}"
     return 0
 }
 
@@ -202,13 +208,10 @@ _remember_env_cache_load() {
     [ "${REMEMBER_ENV_CACHE:-1}" = "1" ] || return 1
     _remember_env_cache_path || return 1
     local _f="$_REMEMBER_ENV_CACHE_FILE"
-    [ -f "$_f" ] || return 1
-    [ -L "$_f" ] && return 1
-    [ -O "$_f" ] || return 1
-    [ -r "$_f" ] || return 1
+    [ -f "$_f" ] && [ ! -L "$_f" ] && [ -O "$_f" ] && [ -r "$_f" ] || return 1
 
     local _line _dir="" _tz="" _mem="" _proj="" _pipe="" _stamp=""
-    local _cooldown="" _delta=""
+    local _cooldown="" _delta="" _cfg_exists_raw="" _cfg_raw=""
     local _env_proj="" _env_pipe="" _env_home=""
     local _cfgs=()
     while IFS= read -r _line || [ -n "$_line" ]; do
@@ -216,24 +219,60 @@ _remember_env_cache_load() {
         # path — the #84 class of bug, and invisible in every error message.
         _line="${_line%$'\r'}"
         [ -n "$_line" ] || continue
-        case "$_line" in
-            REMEMBER_DIR=*)          _dir="${_line#*=}" ;;
-            REMEMBER_TZ=*)           _tz="${_line#*=}" ;;
-            REMEMBER_PROMPT_STAMP=*) _stamp="${_line#*=}" ;;
-            REMEMBER_SAVE_COOLDOWN=*) _cooldown="${_line#*=}" ;;
-            REMEMBER_DELTA_THRESHOLD=*) _delta="${_line#*=}" ;;
-            MEMORY_PROJECT_DIR=*)    _mem="${_line#*=}" ;;
-            PROJECT_DIR=*)           _proj="${_line#*=}" ;;
-            PIPELINE_DIR=*)          _pipe="${_line#*=}" ;;
-            CACHE_ENV_PROJECT_DIR=*) _env_proj="${_line#*=}" ;;
-            CACHE_ENV_PLUGIN_ROOT=*) _env_pipe="${_line#*=}" ;;
-            CACHE_ENV_HOME=*)        _env_home="${_line#*=}" ;;
-            CACHE_CONFIG=*)          _cfgs[${#_cfgs[@]}]="${_line#*=}" ;;
-            # An unknown line means this is not our file, or not our version of
-            # it. Distrust the whole thing; the cost of being wrong is one slow
-            # prompt, and the cost of guessing is memory in the wrong place.
-            *) return 1 ;;
-        esac
+        # `[ ]` prefix tests, not a `case` with a catch-all `*)` arm inside
+        # this loop (#898 round 7 -- that shape, nested one included, is one
+        # the plugin directory's scanner holds a submission on).
+        if [ "${_line#REMEMBER_DIR=}" != "$_line" ]; then
+            _dir="${_line#*=}"
+        elif [ "${_line#REMEMBER_TZ=}" != "$_line" ]; then
+            _tz="${_line#*=}"
+        elif [ "${_line#REMEMBER_PROMPT_STAMP=}" != "$_line" ]; then
+            _stamp="${_line#*=}"
+        elif [ "${_line#REMEMBER_SAVE_COOLDOWN=}" != "$_line" ]; then
+            _cooldown="${_line#*=}"
+        elif [ "${_line#REMEMBER_DELTA_THRESHOLD=}" != "$_line" ]; then
+            _delta="${_line#*=}"
+        elif [ "${_line#MEMORY_PROJECT_DIR=}" != "$_line" ]; then
+            _mem="${_line#*=}"
+        elif [ "${_line#PROJECT_DIR=}" != "$_line" ]; then
+            _proj="${_line#*=}"
+        elif [ "${_line#PIPELINE_DIR=}" != "$_line" ]; then
+            _pipe="${_line#*=}"
+        elif [ "${_line#CACHE_ENV_PROJECT_DIR=}" != "$_line" ]; then
+            _env_proj="${_line#*=}"
+        elif [ "${_line#CACHE_ENV_PLUGIN_ROOT=}" != "$_line" ]; then
+            _env_pipe="${_line#*=}"
+        elif [ "${_line#CACHE_ENV_HOME=}" != "$_line" ]; then
+            _env_home="${_line#*=}"
+        elif [ "${_line#CACHE_CONFIG=}" != "$_line" ]; then
+            # #843: the value carries a "1:" or "0:" prefix recording whether
+            # this layer existed AT PUBLISH time, before the path -- not a
+            # separate header line, which would cost one more `read` builtin
+            # on every load and was measured to blow the #330/#395 hot-path
+            # read budget by exactly one. Splitting on the FIRST `:` is safe
+            # even for a Windows path with its own drive-letter colon
+            # (`C:\path`), since the prefix colon always comes first. Any
+            # other shape (a cache from a release before this prefix existed,
+            # or anything else unrecognised) is rejected outright -- same
+            # "distrust the whole thing" rule the final `else` below applies
+            # to any other unknown line.
+            _cfg_raw="${_line#*=}"
+            if [ "${_cfg_raw#1:}" != "$_cfg_raw" ]; then
+                _cfgs[${#_cfgs[@]}]="${_cfg_raw#1:}"
+                _cfg_exists_raw="${_cfg_exists_raw}1"
+            elif [ "${_cfg_raw#0:}" != "$_cfg_raw" ]; then
+                _cfgs[${#_cfgs[@]}]="${_cfg_raw#0:}"
+                _cfg_exists_raw="${_cfg_exists_raw}0"
+            else
+                return 1
+            fi
+        else
+            # An unknown line means this is not our file, or not our version
+            # of it. Distrust the whole thing; the cost of being wrong is one
+            # slow prompt, and the cost of guessing is memory in the wrong
+            # place.
+            return 1
+        fi
     done < "$_f"
 
     [ -n "$_dir" ] && [ -n "$_proj" ] && [ -n "$_pipe" ] || return 1
@@ -250,8 +289,8 @@ _remember_env_cache_load() {
     # already refuses to publish anything else. A cache from a release before
     # these keys existed carries no answer for them and loses to the chain,
     # once, at upgrade.
-    case "$_cooldown" in '' | *[!0-9]*) return 1 ;; esac
-    case "$_delta" in '' | *[!0-9]*) return 1 ;; esac
+    if [ -z "$_cooldown" ] || [[ "$_cooldown" == *[!0-9]* ]]; then return 1; fi
+    if [ -z "$_delta" ] || [[ "$_delta" == *[!0-9]* ]]; then return 1; fi
     # Compared against the SAME identity _remember_env_cache_path just keyed
     # on (CLAUDE_PROJECT_DIR, falling back to REMEMBER_HOOK_CWD, #469) rather
     # than raw CLAUDE_PROJECT_DIR directly -- on Codex (live-confirmed,
@@ -262,17 +301,30 @@ _remember_env_cache_load() {
     # CLAUDE_PROJECT_DIR (#456, unverified live -- #532), in which case the
     # comparison above is against that value directly and this fallback path
     # is simply never exercised on Gemini.
-    [ "$_env_proj" = "${_REMEMBER_ENV_CACHE_KEY:-}" ] || return 1
+    [ "$_env_proj" = "${_REMEMBER_ENV_CACHE_PROJECT_DIR:-}" ] || return 1
     [ "$_env_pipe" = "${CLAUDE_PLUGIN_ROOT:-}" ] || return 1
     [ "$_env_home" = "${HOME:-}" ] || return 1
     [ -d "$_pipe" ] || return 1
 
-    local _cfg
+    local _cfg _cfg_exists_now=""
     for _cfg in ${_cfgs[@]+"${_cfgs[@]}"}; do
         [ -n "$_cfg" ] || continue
-        # Newer config than cache — including a layer created since — wins.
-        [ "$_f" -nt "$_cfg" ] || return 1
+        # #843: -nt is only meaningful for a layer that exists right now --
+        # true against an absent one, which is the right answer for a layer
+        # that NEVER existed, but says nothing about a layer that existed at
+        # publish time and has since been DELETED (deleting a file changes
+        # no mtime -nt looks at). Build the current existence manifest here;
+        # it is compared against the one recorded at publish time below,
+        # after the loop, so a layer appearing or vanishing is always a miss.
+        if [ -e "$_cfg" ]; then
+            _cfg_exists_now="${_cfg_exists_now}1"
+            # Newer config than cache — including a layer created since — wins.
+            [ "$_f" -nt "$_cfg" ] || return 1
+        else
+            _cfg_exists_now="${_cfg_exists_now}0"
+        fi
     done
+    [ "$_cfg_exists_raw" = "$_cfg_exists_now" ] || return 1
 
     PROJECT_DIR="$_proj"
     PIPELINE_DIR="$_pipe"
@@ -281,7 +333,8 @@ _remember_env_cache_load() {
     REMEMBER_PROMPT_STAMP="$_stamp"
     REMEMBER_SAVE_COOLDOWN="$_cooldown"
     REMEMBER_DELTA_THRESHOLD="$_delta"
-    MEMORY_PROJECT_DIR="${_mem:-$_proj}"
+    MEMORY_PROJECT_DIR="$_mem"
+    [ -n "$MEMORY_PROJECT_DIR" ] || MEMORY_PROJECT_DIR="$_proj"
     export PROJECT_DIR PIPELINE_DIR REMEMBER_DIR REMEMBER_TZ MEMORY_PROJECT_DIR
     export REMEMBER_PROMPT_STAMP REMEMBER_SAVE_COOLDOWN REMEMBER_DELTA_THRESHOLD
     return 0
@@ -333,29 +386,46 @@ _remember_env_cache_publish() {
     # trailing suffix after the X's (BSD mktemp only substitutes a run of X's
     # at the very end of the template; anything after is left literal).
     _t=$(mktemp "${_f}.XXXXXX" 2>/dev/null) || return 0
+    local _ecp_mem_proj="${MEMORY_PROJECT_DIR:-}" _c _e
+    [ -n "$_ecp_mem_proj" ] || _ecp_mem_proj="$PROJECT_DIR"
     {
-        # The same identity the file is keyed and validated on (#469), not
-        # raw CLAUDE_PROJECT_DIR: on a caller whose only identity source was
-        # REMEMBER_HOOK_CWD, printing CLAUDE_PROJECT_DIR here would record a
-        # value _remember_env_cache_load's later comparison can never match.
-        printf 'CACHE_ENV_PROJECT_DIR=%s\n' "$_REMEMBER_ENV_CACHE_KEY"
-        printf 'CACHE_ENV_PLUGIN_ROOT=%s\n' "${CLAUDE_PLUGIN_ROOT:-}"
-        printf 'CACHE_ENV_HOME=%s\n' "${HOME:-}"
-        printf 'PROJECT_DIR=%s\n' "$PROJECT_DIR"
-        printf 'PIPELINE_DIR=%s\n' "$PIPELINE_DIR"
-        printf 'REMEMBER_DIR=%s\n' "$REMEMBER_DIR"
-        printf 'REMEMBER_TZ=%s\n' "${REMEMBER_TZ:-}"
-        printf 'REMEMBER_PROMPT_STAMP=%s\n' "${REMEMBER_PROMPT_STAMP:-full}"
-        # No `:-120`/`:-50` fallback here — the guard above already refused to
-        # reach this line unless both were actually set by log.sh, and a
-        # default at the point of writing is exactly the silent stand-in
-        # #358 was filed about.
-        printf 'REMEMBER_SAVE_COOLDOWN=%s\n' "$REMEMBER_SAVE_COOLDOWN"
-        printf 'REMEMBER_DELTA_THRESHOLD=%s\n' "$REMEMBER_DELTA_THRESHOLD"
-        printf 'MEMORY_PROJECT_DIR=%s\n' "${MEMORY_PROJECT_DIR:-$PROJECT_DIR}"
-        printf 'CACHE_CONFIG=%s\n' "${PIPELINE_DIR}/config.json"
-        printf 'CACHE_CONFIG=%s\n' "${HOME:-}/.remember/config.json"
-        printf 'CACHE_CONFIG=%s\n' "${REMEMBER_DIR}/config.json"
+        # One printf, which reuses its format for each KEY value pair (#898).
+        # CACHE_ENV_PROJECT_DIR is the same identity the file is keyed and
+        # validated on (#469), not raw CLAUDE_PROJECT_DIR: on a caller whose
+        # only identity source was REMEMBER_HOOK_CWD, printing
+        # CLAUDE_PROJECT_DIR here would record a value
+        # _remember_env_cache_load's later comparison can never match.
+        # No `:-120`/`:-50` fallback for the two thresholds -- the guard above
+        # already refused to reach this line unless both were actually set by
+        # log.sh, and a default at the point of writing is exactly the silent
+        # stand-in #358 was filed about.
+        printf '%s=%s\n' \
+            CACHE_ENV_PROJECT_DIR "$_REMEMBER_ENV_CACHE_PROJECT_DIR" \
+            CACHE_ENV_PLUGIN_ROOT "${CLAUDE_PLUGIN_ROOT:-}" \
+            CACHE_ENV_HOME "${HOME:-}" \
+            PROJECT_DIR "$PROJECT_DIR" \
+            PIPELINE_DIR "$PIPELINE_DIR" \
+            REMEMBER_DIR "$REMEMBER_DIR" \
+            REMEMBER_TZ "${REMEMBER_TZ:-}" \
+            REMEMBER_PROMPT_STAMP "${REMEMBER_PROMPT_STAMP:-full}" \
+            REMEMBER_SAVE_COOLDOWN "$REMEMBER_SAVE_COOLDOWN" \
+            REMEMBER_DELTA_THRESHOLD "$REMEMBER_DELTA_THRESHOLD" \
+            MEMORY_PROJECT_DIR "$_ecp_mem_proj"
+        # #843: each CACHE_CONFIG value carries a "1:" or "0:" prefix
+        # recording whether that layer existed RIGHT NOW (at publish time),
+        # so the loader can reject a cache whose manifest no longer matches
+        # -- a deleted layer changes no mtime the loader's -nt loop looks
+        # at, so without this a deleted layer's value would stay in effect
+        # forever. Embedded in the existing line rather than a new one: a
+        # separate header line costs one more `read` builtin on every load,
+        # which blew the #330/#395 hot-path read budget by exactly one when
+        # tried first.
+        for _c in "${PIPELINE_DIR}/config.json" "${HOME:-}/.remember/config.json" \
+                  "${REMEMBER_DIR}/config.json"; do
+            _e=0
+            [ -e "$_c" ] && _e=1
+            printf 'CACHE_CONFIG=%s:%s\n' "$_e" "$_c"
+        done
     } > "$_t" 2>/dev/null || { rm -f "$_t" 2>/dev/null; return 0; }
     # Rename, so no reader ever parses a partial file and rejects a resolution
     # that was merely mid-write.
