@@ -11,7 +11,7 @@ a hook that never returns never reaches the point where it could say anything.
 What is asserted here is both halves, because the issue is both halves:
 
     a hook that hangs is STOPPED, and the fact that it was stopped REACHES
-    `hook-errors.log` — the file `/remember:doctor` tails.
+    `hook-errors.log` — the file `/memory:doctor` tails.
 
 Two more invariants get their own tests because getting them wrong is how a
 timeout becomes worse than the stall it prevents:
@@ -179,7 +179,7 @@ class TestAHungHookIsStopped:
     def test_the_stop_reaches_the_file_the_doctor_reads(self, tmp_path):
         """"logs nothing" is half of what #286 is about.
 
-        `/remember:doctor` tails `hook-errors.log` under "Recent errors", and
+        `/memory:doctor` tails `hook-errors.log` under "Recent errors", and
         that is the file maintainers ask a reporter to paste. A hook that
         stalled the agent and left no trace there is indistinguishable, in
         every report anyone reads, from a session where nothing happened.
@@ -213,7 +213,7 @@ class TestAHungHookIsStopped:
         `_dispatch_report_failure` says so with its exit status and its own
         words. A hook that was killed has answered nothing. Reporting the
         second in the shape of the first ("hook failed (exit 143)") invents a
-        verdict the hook never gave, and `/remember:doctor` would show a fault
+        verdict the hook never gave, and `/memory:doctor` would show a fault
         where what exists is an absence of information.
         """
         plugin, project = _setup(tmp_path)

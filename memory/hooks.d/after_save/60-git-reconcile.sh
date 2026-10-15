@@ -93,7 +93,7 @@ source "$PIPELINE_DIR/scripts/lib-lock.sh"
 # the hook the way a read gating the exit itself could.
 # Self-review finding (oss:auditor, #969): a bare `echo ... >&2` reaches
 # neither the daily log nor hook-errors.log, so this disablement would be
-# invisible to the one durable surface (`/remember:doctor`'s "Recent
+# invisible to the one durable surface (`/memory:doctor`'s "Recent
 # errors") a human or a future agent actually checks, and indistinguishable
 # from the pre-existing, intentional "git_reconcile.enabled is false" no-op.
 # report_error() is already sourced (log.sh, above) and is what every other
@@ -104,7 +104,7 @@ source "$PIPELINE_DIR/scripts/lib-lock.sh"
 # #976: that report_error call used to fire unconditionally, before this
 # flag read even existed -- so it reached hook-errors.log on EVERY save for
 # EVERY installed user, including the default-disabled majority who never
-# opted into git_reconcile at all, permanently tripping /remember:doctor's
+# opted into git_reconcile at all, permanently tripping /memory:doctor's
 # "Recent errors" WARN. The notice is only useful to someone who turned the
 # flag on and is now finding it inert, so read the flag here ONLY to gate
 # the notice -- the `exit 0` stays unconditional either way.

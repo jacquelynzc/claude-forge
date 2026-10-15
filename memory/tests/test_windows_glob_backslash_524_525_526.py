@@ -6,7 +6,7 @@ audit ahead of v0.26.0.
 
 #524: doctor.sh's `_SESSION_END_FIRED` glob (line ~469) silently stays 0
 under a backslash-separated REMEMBER_DIR even when a real
-session-end-*.log exists, so /remember:doctor falls through to its
+session-end-*.log exists, so /memory:doctor falls through to its
 transcript heuristic and misreports a hook-registration problem that does
 not exist.
 

@@ -1,7 +1,7 @@
 """doctor.sh must have something to say about an over-cap store (#348).
 
 The session-start notice shipped in #347 tells the user to run
-``/remember:doctor`` when a memory file is too large to inject. Today that
+``/memory:doctor`` when a memory file is too large to inject. Today that
 command says nothing at all about the condition -- it prints one line summing
 every memory file's bytes and moves on. A remedy that points at a diagnostic
 which is silent about the thing it was pointed at is worse than no pointer: the
@@ -84,7 +84,7 @@ def test_an_over_cap_recent_is_named_by_doctor(tmp_path):
     assert result.returncode == 0, result.stderr
     assert "consolidation" in result.stdout.lower(), (
         "doctor says nothing about consolidation being blocked by the store's "
-        "size -- the /remember:doctor pointer in the session-start notice "
+        "size -- the /memory:doctor pointer in the session-start notice "
         "lands on silence:\n" + result.stdout
     )
     assert "recent.md" in result.stdout, (

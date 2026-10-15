@@ -1,4 +1,4 @@
-"""#859 -- /remember:doctor's `allowed-tools: Bash` front matter pre-approved
+"""#859 -- /memory:doctor's `allowed-tools: Bash` front matter pre-approved
 *any* shell command for the full run of the command, because the command body
 only ever runs one script. The Anthropic directory flags this as "Pre-approves
 broad shell access in allowed-tools" on any version it scans, including the

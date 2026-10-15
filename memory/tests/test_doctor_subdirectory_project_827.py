@@ -8,7 +8,7 @@ disambiguates a project deliberately started from a repository subdirectory by
 checking which candidate directory's own REMEMBER_DIR already carries THIS
 session's session-keyed handoff hint (#738). doctor.sh's --json and human-report
 project-dir resolution (scripts/doctor.sh, added by #802) copied #743's blanket
-git-root preference without carrying that disambiguation, so `/remember:doctor`
+git-root preference without carrying that disambiguation, so `/memory:doctor`
 run from inside such a subdirectory project (with CLAUDE_PROJECT_DIR unset)
 reports on the enclosing repository's own store instead of the project's own.
 """

@@ -116,7 +116,7 @@ Once installed there is nothing to run. Two commands are worth knowing.
 
 Before clearing context or ending a session, type `/remember`. The agent writes a short handoff note; the next session starts with it loaded. How delivery is counted and what two sessions on one store do: [docs/handoff.md](docs/handoff.md).
 
-### Diagnostics (`/remember:doctor`)
+### Diagnostics (`/memory:doctor`)
 
 Run it when memory is not appearing and nothing says why. It prints resolved paths, storage mode, and whether each hook has ever fired for this project. JSON output and the consolidation cap: [docs/diagnostics.md](docs/diagnostics.md).
 

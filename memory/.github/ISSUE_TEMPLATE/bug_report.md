@@ -33,7 +33,7 @@ What did you expect to happen?
 What happened instead? Include hook output / error messages / contents of
 `.remember/now.md` if relevant.
 
-**Please attach `<your memory store>/logs/hook-errors.log`** — `/remember:doctor`
+**Please attach `<your memory store>/logs/hook-errors.log`** — `/memory:doctor`
 tails it under "Recent errors". It carries the stderr of any hook that failed,
 with its exit status, and is usually the difference between one round of
 questions and three.

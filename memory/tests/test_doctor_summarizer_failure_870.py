@@ -1,4 +1,4 @@
-"""#870: /remember:doctor said "capture is working" throughout a 10-day
+"""#870: /memory:doctor said "capture is working" throughout a 10-day
 summarizer auth outage, because "Last successful save" is read from
 tmp/last-save.json's mtime, and save-position rewrites that file on every
 attempt -- a SKIP, a quarantine, or an ordinary append -- not only on a

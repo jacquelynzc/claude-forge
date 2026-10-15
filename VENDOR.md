@@ -397,8 +397,10 @@ Imported 2026-10-15 at upstream tag v0.43.1, verbatim (`.git/` excluded)
 except for the name. The directory is `memory/` and `.claude-plugin/plugin.json`
 says `"name": "memory"`, because a plugin named `remember` collides with
 `remember@claude-plugins-official`. Skills are therefore `/memory:remember`
-and `/memory:doctor`. Upstream's own messages still say `/remember:doctor`, and
-the `.codex-plugin`/`.gemini` manifests were left as upstream ships them.
+and `/memory:doctor`. Every `remember:doctor` and `remember:remember` in
+scripts, hooks, docs and tests was rewritten to the `memory:` form (CHANGELOG,
+`changelog.d/` and recorded test fixtures left as history). The
+`.codex-plugin`/`.gemini` manifests were left as upstream ships them.
 
 The 0.33.0 install carried one local patch to `skills/remember/SKILL.md`: with
 no `=== HANDOFF ===` block in context, resolve the handoff path from

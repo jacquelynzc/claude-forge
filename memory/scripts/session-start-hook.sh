@@ -725,7 +725,7 @@ _remember_write_slug_index() {
 # today, so repeating it every session start would spend the one channel a
 # human actually reads (#200) on wallpaper — the argument `_push_and_report`
 # makes for its threshold, with the threshold replaced by "say it again only
-# when it says something different". `/remember:doctor` re-runs the check live
+# when it says something different". `/memory:doctor` re-runs the check live
 # and reports every time, which is where someone who suspects a problem looks.
 _remember_write_case_divergence() {
     source "$_HOOK_DIR/lib-case-divergence.sh" 2>/dev/null || return 0
@@ -789,7 +789,7 @@ _remember_write_case_divergence() {
         # identical line per session for the life of the install is the
         # wallpaper #252's five weeks of identical daily lines proved
         # nobody reads. It is still never rendered as agreement anywhere
-        # that reports it; `/remember:doctor` says it every time.
+        # that reports it; `/memory:doctor` says it every time.
         [ "$_old" = "$_body" ] && return 0
         log "case-divergence" "could not check for a second spelling of this store (disk=$REMEMBER_CASE_DISK_STATE${REMEMBER_CASE_DISK_REASON:+/$REMEMBER_CASE_DISK_REASON} git=$REMEMBER_CASE_GIT_STATE${REMEMBER_CASE_GIT_REASON:+/$REMEMBER_CASE_GIT_REASON}) -- not a report that they agree"
     fi
@@ -805,7 +805,7 @@ _remember_write_case_divergence() {
 #
 # A reporter's transcripts opened with `"type":"queue-operation"` and had no
 # `capture-alive.d/<id>` marker -- the capture-gap notice fired even though
-# `/remember:doctor` reported the session as saved, and separately, recovery
+# `/memory:doctor` reported the session as saved, and separately, recovery
 # force-saved another plugin's own review into the user's memory. A second
 # report on the same issue (kenspc, 16 real transcripts) found the real
 # discriminator: every marker-less transcript in that sample was
@@ -1043,7 +1043,7 @@ local -x _REMEMBER_PHASE=deferred
 # Records, moved here from their original call sites above (#660). All three
 # are pure side effects -- verified mechanically that none of them assigns
 # anything read later in this hook -- and their outputs are read by
-# the UserPromptSubmit hook and /remember:doctor, never by the start itself.
+# the UserPromptSubmit hook and /memory:doctor, never by the start itself.
 _remember_write_slug_record
 _remember_write_slug_index
 _remember_write_case_divergence
@@ -1147,7 +1147,7 @@ fi
 # per-session marker directory, membership-tested. Three sources are accepted
 # as evidence of capture, because a false positive here costs more than a
 # false negative: this warning has no second chance to be believed, whereas a
-# missed gap is still caught by /remember:doctor and, for the content itself,
+# missed gap is still caught by /memory:doctor and, for the content itself,
 # by the recovery block directly above.
 #
 # Deliberately NOT gated on "have we run before". A first cut required a prior
@@ -1272,7 +1272,7 @@ CAPTURE_SKIPPED="$REMEMBER_DIR/tmp/capture-gap-skipped"
 if [ -z "$CURRENT_SESSION_ID" ]; then
     # Without a session id this check cannot tell our own transcript from the
     # previous session's, and its output is an accusation. A missed gap is
-    # still caught by /remember:doctor and, for the content itself, by the
+    # still caught by /memory:doctor and, for the content itself, by the
     # recovery block above; a false one accuses a healthy install and spends
     # the credibility this warning needs the one time it is true. It has no
     # second chance to be believed — the same asymmetry that made three
@@ -1304,15 +1304,15 @@ else
        && ! capture_was_seen "$PREV_ID" \
        && grep -q '"tool_use"' "$PREV_JSONL" 2>/dev/null; then
         # Two wordings (#745): the flat "not captured, run doctor" notice
-        # contradicts /remember:doctor's own "capture is working" verdict once
+        # contradicts /memory:doctor's own "capture is working" verdict once
         # the recovery fork above finishes and last-save.json records the
         # rescue -- a reporter's save landed 9h after the session ended, long
         # after this notice had already been written and read. When THIS run
         # kicked off that fork for PREV_ID, say so instead of leaving the two
         # disagree.
-        _capture_gap_notice="remember: your previous session was not captured. If you just installed or enabled the plugin, that is expected -- capture starts now. Otherwise its hooks were not registered for that session; run /remember:doctor."
+        _capture_gap_notice="remember: your previous session was not captured. If you just installed or enabled the plugin, that is expected -- capture starts now. Otherwise its hooks were not registered for that session; run /memory:doctor."
         if [ "$_recovery_attempted" = "true" ]; then
-            _capture_gap_notice="remember: your previous session was not captured live -- its hooks did not run. It is being recovered from its transcript now, so nothing should be lost; if this keeps happening for interactive sessions, run /remember:doctor."
+            _capture_gap_notice="remember: your previous session was not captured live -- its hooks did not run. It is being recovered from its transcript now, so nothing should be lost; if this keeps happening for interactive sessions, run /memory:doctor."
         fi
         echo "$_capture_gap_notice" \
             > "$REMEMBER_DIR/tmp/capture-gap-notice" 2>/dev/null || true
@@ -2370,7 +2370,7 @@ if [ -n "$_REMEMBER_HOOK_ELAPSED_S" ]; then
     log "hook" "session-start took ${_REMEMBER_HOOK_ELAPSED_S}s"
     if [ "$_REMEMBER_HOOK_ELAPSED_S" -ge "$REMEMBER_SESSION_START_SLOW_S" ]; then
         echo "=== SESSION-START ==="
-        echo "This hook took ${_REMEMBER_HOOK_ELAPSED_S}s (>= ${REMEMBER_SESSION_START_SLOW_S}s threshold); a slow host and a slow plugin look the same here -- see \`/remember:doctor\` and the daily log."
+        echo "This hook took ${_REMEMBER_HOOK_ELAPSED_S}s (>= ${REMEMBER_SESSION_START_SLOW_S}s threshold); a slow host and a slow plugin look the same here -- see \`/memory:doctor\` and the daily log."
         echo ""
     fi
 else

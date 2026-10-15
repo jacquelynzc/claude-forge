@@ -2,7 +2,7 @@
 "exits immediately, before even reading this flag" -- #979 made that false:
 `hooks.d/after_save/60-git-reconcile.sh` lines ~111-115 read the flag FIRST,
 and when it is `true` the hook appends a `disabled pending #969` notice to
-`hook-errors.log` on every save (which trips `/remember:doctor`'s Recent
+`hook-errors.log` on every save (which trips `/memory:doctor`'s Recent
 errors WARN for exactly the users who opted in). #979 fixed the identical
 "exits before ever reading" wording in eight test copies but missed this
 shipped doc line.
@@ -33,7 +33,7 @@ def test_reconcile_flag_doc_names_the_hook_errors_notice():
     """The doc row must now describe the actual read-then-notify behavior
     the code has -- not merely drop the false claim."""
     assert "hook-errors.log" in CONFIGURATION
-    assert "/remember:doctor" in CONFIGURATION
+    assert "/memory:doctor" in CONFIGURATION
 
 
 def test_reconcile_hook_actually_reads_the_flag_before_exiting():

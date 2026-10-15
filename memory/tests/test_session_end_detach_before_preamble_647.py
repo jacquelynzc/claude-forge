@@ -167,5 +167,5 @@ def test_hook_returns_before_its_preamble_and_still_flushes(tmp_path):
     logs = sorted((remember / "logs" / "autonomous").glob("session-end-*.log"))
     assert logs, (
         "the flush ran but no session-end-*.log trace was written, so "
-        "/remember:doctor would still report SessionEnd as never having fired."
+        "/memory:doctor would still report SessionEnd as never having fired."
     )

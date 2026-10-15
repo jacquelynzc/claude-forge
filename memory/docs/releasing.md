@@ -645,7 +645,7 @@ was "Validation ran out of time". That is the failure the `release` branch exist
     `/plugin` configure round-trip this environment cannot drive) is the only recovery-token source
     on Claude Code now. A still-configured legacy value is detected by **presence only** -- never
     its content -- and reported once per save as a `NOTICE:` line naming the source, surfaced by
-    `/remember:doctor`, so no existing install silently loses its recovery path without being told.
+    `/memory:doctor`, so no existing install silently loses its recovery path without being told.
   - **`CLAUDE_CODE_OAUTH_TOKEN` is handled by exactly one mechanism now**: `_child_env()` simply
     never strips it from the parent environment -- the nested `claude -p` inherits the host's own
     login the same way any other unstripped variable would, which is what "inherits on its own"
@@ -674,7 +674,7 @@ was "Validation ran out of time". That is the failure the `release` branch exist
     native `codex exec` route never read either one; only its fallthrough to the shared `claude -p`
     code path, `REMEMBER_SUMMARIZER_FALLBACK=claude`, ever did) and is flatly wrong now that the
     recovery-token code has no host branch left to read them on. Codex has no `userConfig`
-    mechanism, so there is genuinely no replacement for that one fallthrough case -- `/remember:doctor`'s
+    mechanism, so there is genuinely no replacement for that one fallthrough case -- `/memory:doctor`'s
     notice still fires there, informationally, since the detection itself is also host-agnostic.
   - **Grep sweep for `token|credential|api_key|oauth` (case-insensitive) across shipped file
     types**, per the round-2 instruction: 51 files, 542 lines matched. The overwhelming majority are
@@ -741,7 +741,7 @@ was "Validation ran out of time". That is the failure the `release` branch exist
   CLI's own login, with no recovery path of this plugin's own on either host. A still-configured
   legacy setting (the removed manifest option, or the older environment variable it replaced) is
   still detected by presence only, never by value, and reported once per save and from
-  `/remember:doctor`, so nobody is left wondering where a setting went. Rebuilding the release tree
+  `/memory:doctor`, so nobody is left wondering where a setting went. Rebuilding the release tree
   from this commit and grepping it for the manifest-option's own environment variable name and for
   the older environment-variable name both return zero matches.
   **Round 4 (#898).** A maintainer Validate of the combined `fix/898` round-3 tree plus a sibling
@@ -910,7 +910,7 @@ was "Validation ran out of time". That is the failure the `release` branch exist
   `tests/test_case_rewrite_equivalence_898.py` runs each old shape and its rewrite on the same
   inputs in every bash it finds (macOS `/bin/bash` 3.2 included) under C and a UTF-8 locale. The
   `.install-marker` text no longer names `scripts/doctor.sh` by path (a script named in a string is
-  a script the portal lists); it says `/remember:doctor`.
+  a script the portal lists); it says `/memory:doctor`.
 - **`RUNTIME_FETCH_EXEC`** flags text that downloads and runs code, and the portal says it looks at
   "a hook, a server or settings command, a script, or text such as a skill or README". On v0.37.0
   (`e6cf58f`) it named `pipeline/shell.py` and `scripts/log.sh`, which contain no download at all.

@@ -278,7 +278,7 @@ class TestASkippedHookIsVisibleToDoctor:
 
     def test_a_world_writable_hook_skip_reaches_hook_errors_log(self, tmp_path):
         """`dispatch()` refuses to run a world-writable hook and warns to the
-        DAILY log only. `/remember:doctor` reports "Recent errors" from
+        DAILY log only. `/memory:doctor` reports "Recent errors" from
         `hook-errors.log`, so a hook that never runs and never will is
         invisible to the one report anybody reads — it says OK. That is #252's
         finding exactly, reached from another direction.
@@ -300,7 +300,7 @@ class TestASkippedHookIsVisibleToDoctor:
         errlog = os.path.join(project, ".remember", "logs", "hook-errors.log")
         assert os.path.isfile(errlog), (
             "A hook was permanently skipped and hook-errors.log was never "
-            "written — /remember:doctor reports OK."
+            "written — /memory:doctor reports OK."
         )
         body = open(errlog).read()
         assert "50-open.sh" in body and "world-writable" in body, (

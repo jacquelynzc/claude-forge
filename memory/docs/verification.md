@@ -155,7 +155,7 @@ Expected: `result.is_skip` is **not** necessarily `False` — the legacy value
 authenticates nothing now — but the daily log carries a line naming the
 legacy source (`REMEMBER_OAUTH_TOKEN` or `haiku.oauth_token in <path>`) and
 pointing at `/plugin` → `remember` → Configure, and that line never contains
-the configured value itself. `/remember:doctor`'s own "Legacy recovery-token
+the configured value itself. `/memory:doctor`'s own "Legacy recovery-token
 config" section should surface the same line.
 
 ## 6. What to record

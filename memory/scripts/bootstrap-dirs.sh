@@ -83,7 +83,7 @@ if [ "$_legacy_rd" != "$_legacy_dir" ] && [ "${_legacy_rd#"$_legacy_dir"/}" = "$
     && [ ! -e "$REMEMBER_DIR" ] && [ -d "$_legacy_dir" ]; then
     for _legacy_f in now.md recent.md archive.md core-memories.md remember.md; do
         if [ -f "$_legacy_dir/$_legacy_f" ]; then
-            printf 'remember: %s holds memory data but data_dir points to %s -- move it by hand (see /remember:doctor)\n' \
+            printf 'remember: %s holds memory data but data_dir points to %s -- move it by hand (see /memory:doctor)\n' \
                 "$_legacy_dir" "$REMEMBER_DIR" >&2
             break
         fi
@@ -276,7 +276,7 @@ fi
 # doctor.sh already renders as the honest answer for a fresh install.
 if [ -d "$REMEMBER_DIR" ]; then
     [ -f "$REMEMBER_DIR/.install-marker" ] \
-        || { echo 'This file marks when remember was first bootstrapped here. Read only by /remember:doctor (#401); do not delete it.' \
+        || { echo 'This file marks when remember was first bootstrapped here. Read only by /memory:doctor (#401); do not delete it.' \
             > "$REMEMBER_DIR/.install-marker"; } 2>/dev/null
 fi
 

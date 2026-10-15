@@ -5,7 +5,7 @@ external REMEMBER_DIR on first run. That automatic migration is gone (#898):
 nothing is moved, nothing is deleted. When the old in-project `.remember/`
 still holds memory data while data_dir points elsewhere, and that new
 location does not exist yet, one stderr line says so and the operator moves
-it by hand (see docs/external-storage-mode.md and /remember:doctor).
+it by hand (see docs/external-storage-mode.md and /memory:doctor).
 
 Every "silent" case is paired with the firing case in the same fixture
 shape: a notice that never prints would pass every silent assertion.
@@ -146,7 +146,7 @@ class TestLegacyStoreNotice:
         assert lines[0].startswith("remember: ")
         assert _bash_path(legacy) in lines[0]
         assert remember_dir in lines[0]
-        assert "/remember:doctor" in lines[0]
+        assert "/memory:doctor" in lines[0]
 
         assert (legacy / "now.md").read_text() == "## 10:00 | master\nSome work.\n"
         assert (legacy / "tmp" / "last-save.json").exists()
@@ -243,7 +243,7 @@ def _doctor(project: Path, home: Path, remember_dir: Path) -> subprocess.Complet
 
 
 class TestDoctorNamesTheLegacyStore:
-    """The notice points at /remember:doctor, so doctor must say something
+    """The notice points at /memory:doctor, so doctor must say something
     about the same condition -- a pointer that lands on silence reads as
     "nothing is wrong"."""
 

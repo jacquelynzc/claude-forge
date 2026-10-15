@@ -5,7 +5,7 @@ The reporter's Windows sessions fail on every exit with
     SessionEnd hook [bash "${CLAUDE_PLUGIN_ROOT}/scripts/session-end-hook.sh"] failed: Hook cancelled
 
 and `.remember/logs/autonomous/` holds not a single `session-end-*.log` across the
-whole project history. `/remember:doctor` then reports "SessionEnd has never fired
+whole project history. `/memory:doctor` then reports "SessionEnd has never fired
 for this project" and attributes it to hook registration -- sending the user to
 debug a registration that is fine.
 
@@ -218,7 +218,7 @@ def test_trace_is_written_even_when_the_flush_cannot_run(tmp_path):
         "SessionEnd ran and returned 0, but wrote no "
         "logs/autonomous/session-end-*.log, so nothing on disk distinguishes "
         "this run from a hook that never fired -- which is what "
-        "/remember:doctor reports, blaming hook registration. The seed write "
+        "/memory:doctor reports, blaming hook registration. The seed write "
         "sits below the early exits it needs to survive. This is #647.\n"
         "stderr: " + result.stderr[:800]
     )

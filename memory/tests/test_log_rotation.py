@@ -365,7 +365,7 @@ def test_a_recovered_rotation_clears_the_failure_state(tmp_path):
 
 
 def test_doctor_reports_a_stuck_rotation(tmp_path):
-    """The escalation surface. ``/remember:doctor`` exists to answer 'is this
+    """The escalation surface. ``/memory:doctor`` exists to answer 'is this
     silently broken?', and until now a permanently-failing rotation was exactly
     the kind of silence it could not see."""
     project, logs, _ = _project(tmp_path)

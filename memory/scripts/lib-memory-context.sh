@@ -784,7 +784,7 @@ _remember_may_inject() {
             # deliver on a guess -- an untrustworthy "no" from the tracked
             # check must read the same as "yes", not the same as a clean
             # "not tracked".
-            _REMEMBER_INJECT_REFUSAL="$_mi_file could not be checked against this repository's git index -- refusing rather than injecting unverified (/remember:doctor shows why)."
+            _REMEMBER_INJECT_REFUSAL="$_mi_file could not be checked against this repository's git index -- refusing rather than injecting unverified (/memory:doctor shows why)."
             log "$_mi_component" "refused injecting $_mi_file: git status unavailable"
         elif [ "$_mi_state" = symlinked-ancestor ]; then
             _REMEMBER_INJECT_REFUSAL="$_mi_file sits under a symlinked directory -- refusing to follow it into session context. This plugin never creates one; inspect where it points."
@@ -995,7 +995,7 @@ _remember_render_memory_section() {
             # #842: a cap set BELOW the bundled 200000 default is a
             # deliberate choice (e.g. to stay under thresholds.
             # session_start_max_bytes), not evidence of a broken store --
-            # /remember:doctor has nothing to diagnose here, and telling an
+            # /memory:doctor has nothing to diagnose here, and telling an
             # operator to run it for a cap they set on purpose is noise.
             # Only while every over-cap file is ALSO within that bundled
             # default, though: the lowered cap explains a 100 KB file, not a
@@ -1003,7 +1003,7 @@ _remember_render_memory_section() {
             # the configured cap, so it keeps the doctor advice below.
             printf 'Capped by config (thresholds.memory_inject_max_bytes=%s, below the bundled default of 200000) -- this is a deliberately lowered cap, not a sign of a malformed memory file.\n' "$MEMORY_INJECT_MAX_BYTES"
         else
-            printf 'A healthy memory file is kilobytes. One this size means consolidation wrote a response nobody bounded (see thresholds.memory_inject_max_bytes) and has been skipping ever since; run /remember:doctor.\n'
+            printf 'A healthy memory file is kilobytes. One this size means consolidation wrote a response nobody bounded (see thresholds.memory_inject_max_bytes) and has been skipping ever since; run /memory:doctor.\n'
         fi
         echo ""
     fi

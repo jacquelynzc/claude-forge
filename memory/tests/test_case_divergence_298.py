@@ -597,7 +597,7 @@ def test_the_notice_is_delivered_on_the_channel_the_human_sees(tmp_path):
     assert NOTICE_NAME in body, f"{NOTICE_NAME} is never consumed by any hook"
 
 
-# ── /remember:doctor ─────────────────────────────────────────────────────────
+# ── /memory:doctor ─────────────────────────────────────────────────────────
 
 
 def test_doctor_reports_the_divergence(tmp_path):
