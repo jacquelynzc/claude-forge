@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { TOOL_CALL_FILE, TOOL_CALL_FILE_MAX_SIZE } from '../config.js';
+import { renameWithRetry } from './rename.js';
 // Ensure the directory for the log file exists
 const logDir = path.dirname(TOOL_CALL_FILE);
 await fs.promises.mkdir(logDir, { recursive: true });
@@ -34,7 +35,7 @@ export async function trackToolCall(toolName, args) {
             const rotateTimestamp = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}_${String(date.getHours()).padStart(2, '0')}-${String(date.getMinutes()).padStart(2, '0')}-${String(date.getSeconds()).padStart(2, '0')}`;
             const newFileName = path.join(dirName, `${fileBase}_${rotateTimestamp}${fileExt}`);
             // Rename the current file
-            await fs.promises.rename(TOOL_CALL_FILE, newFileName);
+            await renameWithRetry(TOOL_CALL_FILE, newFileName);
         }
         // Append to log file (if file was renamed, this will create a new file)
         await fs.promises.appendFile(TOOL_CALL_FILE, logEntry, 'utf8');

@@ -4,6 +4,8 @@ export interface MCPDeviceOptions {
     persistSession?: boolean;
 }
 export declare function getRemoteDeviceConfigPath(): string;
+/** `remote --logout`: removes device.json, under the lock a running device's save takes. */
+export declare function removeRemoteDeviceConfig(configPath?: string): Promise<void>;
 export declare class MCPDevice {
     private baseServerUrl;
     private remoteChannel;
@@ -19,6 +21,14 @@ export declare class MCPDevice {
      * whatever is still in flight.
      */
     private configWriteChain;
+    /**
+     * device.json's text when this run last loaded or saved it. From then on, a
+     * file that is gone or holds other text was removed (`remote --logout`) or
+     * replaced (a login after it) by someone else.
+     */
+    private configTextOnDisk?;
+    /** device.json was removed or replaced after this run loaded or saved it: nothing is saved again this run. */
+    private loggedOutLocally;
     /** Call ids already handled by THIS process (insertion-ordered, bounded). */
     private seenCallIds;
     constructor(options?: MCPDeviceOptions);
@@ -26,6 +36,8 @@ export declare class MCPDevice {
     start(): Promise<void>;
     private findPersistedDeviceWithRetry;
     loadPersistedConfig(): Promise<any>;
+    /** device.json's text, or undefined when there is none. Errors other than "not found" go to the caller, which logs them. */
+    private readConfigText;
     clearPersistedConfig(): Promise<void>;
     /**
      * Queue a config write. Returns the queued write, so a caller that must not
@@ -47,5 +59,7 @@ export declare class MCPDevice {
     /** Record a handled call id, evicting the oldest once the cap is reached. */
     private rememberCallId;
     handleNewToolCall(payload: any): Promise<void>;
+    /** Reports a tool call that failed, or whose result couldn't be saved, and writes its "failed" row. */
+    private reportToolCallFailure;
     shutdown(): Promise<void>;
 }

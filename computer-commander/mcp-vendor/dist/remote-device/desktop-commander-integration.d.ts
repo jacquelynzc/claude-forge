@@ -104,6 +104,7 @@ export declare class DesktopCommanderIntegration {
             type: "resource_link";
             description?: string | undefined;
             mimeType?: string | undefined;
+            size?: number | undefined;
             annotations?: {
                 audience?: ("user" | "assistant")[] | undefined;
                 priority?: number | undefined;

@@ -1,10 +1,12 @@
-import { terminalManager, MAX_BUFFERED_OUTPUT_CHARS } from '../terminal-manager.js';
+import { terminalManager, MAX_BUFFERED_OUTPUT_CHARS, getProcessWaitLimit } from '../terminal-manager.js';
 import { commandManager } from '../command-manager.js';
 import { StartProcessArgsSchema, ReadProcessOutputArgsSchema, InteractWithProcessArgsSchema, ForceTerminateArgsSchema } from './schemas.js';
 import { capture } from "../utils/capture.js";
 import { analyzeProcessState, cleanProcessOutput, formatProcessStateMessage } from '../utils/process-detection.js';
-import * as os from 'os';
 import { configManager } from '../config-manager.js';
+import { getDefaultShell } from '../utils/shell.js';
+import { terminateProcessTree } from '../utils/process-tree.js';
+import { MAX_PROCESS_WAIT_MS } from '../config.js';
 import { spawn } from 'child_process';
 import fs from 'fs/promises';
 import path from 'path';
@@ -16,22 +18,46 @@ const mcpRoot = path.resolve(__dirname, '..', '..');
 // Track virtual Node sessions (PIDs that are actually Node fallback sessions)
 const virtualNodeSessions = new Map();
 let virtualPidCounter = -1000; // Use negative PIDs for virtual sessions
+/** How long a node:local script's output pipes may stay open after its timeout ended its tree */
+const PIPES_CLOSE_WAIT_MS = 1000;
+/** The answer when some processes of a session could not be ended */
+function terminationFailedResult(pid) {
+    return {
+        content: [{ type: "text", text: `Error: Could not terminate every process of session ${pid}; some may still be running` }],
+        isError: true,
+    };
+}
 /**
  * Execute Node.js code via temp file (fallback when Python unavailable)
  * Creates temp .mjs file in MCP directory for ES module import access
  */
-async function executeNodeCode(code, timeout_ms = 30000) {
+async function executeNodeCode(code, timeout_ms = 30000, sessionPid) {
     const tempFile = path.join(mcpRoot, `.mcp-exec-${Date.now()}-${Math.random().toString(36).slice(2)}.mjs`);
     try {
         await fs.writeFile(tempFile, code, 'utf8');
         const result = await new Promise((resolve) => {
             const proc = spawn(process.execPath, [tempFile], {
                 cwd: mcpRoot,
-                timeout: timeout_ms,
                 windowsHide: true // Prevent visible console windows on Windows
             });
             let stdout = '';
             let stderr = '';
+            // Not spawn's own timeout option: that kills only the script, leaving the
+            // processes it started running and holding its output pipes open, so
+            // 'close' never came and the call never returned.
+            const timer = setTimeout(async () => {
+                if (await terminateProcessTree(proc)) {
+                    // The tree ended, but a process that left it before the walk (one
+                    // started by a child that has exited) may still hold the output
+                    // pipes: 'close' answers if it comes within PIPES_CLOSE_WAIT_MS
+                    await new Promise((wait) => setTimeout(wait, PIPES_CLOSE_WAIT_MS).unref());
+                }
+                // Some of the tree survived, or a process outside it holds the output
+                // pipes, so 'close' may never come: answer now and stop reading them
+                proc.stdout.destroy();
+                proc.stderr.destroy();
+                resolve({ stdout, stderr, exitCode: 1, treeSurvived: true });
+            }, timeout_ms);
             proc.stdout.on('data', (data) => {
                 stdout += data.toString();
             });
@@ -39,14 +65,19 @@ async function executeNodeCode(code, timeout_ms = 30000) {
                 stderr += data.toString();
             });
             proc.on('close', (exitCode) => {
+                clearTimeout(timer);
                 resolve({ stdout, stderr, exitCode: exitCode ?? 1 });
             });
             proc.on('error', (err) => {
+                clearTimeout(timer);
                 resolve({ stdout, stderr: stderr + '\n' + err.message, exitCode: 1 });
             });
         });
         // Clean up temp file
         await fs.unlink(tempFile).catch(() => { });
+        if (result.treeSurvived) {
+            return terminationFailedResult(sessionPid);
+        }
         if (result.exitCode !== 0) {
             return {
                 content: [{
@@ -56,11 +87,20 @@ async function executeNodeCode(code, timeout_ms = 30000) {
                 isError: true
             };
         }
+        // Each call runs a fresh script and the session waits for the next one; the output isn't cut
+        const outputLines = result.stdout.trim().length > 0 ? result.stdout.replace(/\r?\n$/, '').split('\n').length : 0;
         return {
             content: [{
                     type: "text",
                     text: result.stdout || '(no output)'
-                }]
+                }],
+            structuredContent: {
+                pid: sessionPid,
+                status: 'waiting_for_input',
+                truncated: false,
+                shownLines: outputLines,
+                totalLines: outputLines,
+            },
         };
     }
     catch (error) {
@@ -78,8 +118,10 @@ async function executeNodeCode(code, timeout_ms = 30000) {
 /**
  * Start a new process (renamed from execute_command)
  * Includes early detection of process waiting for input
+ * maxWaitMs: ceiling for this call's wait. The tools always use MAX_PROCESS_WAIT_MS;
+ * only in-process callers (tests) pass a smaller one. Not part of the tool schema.
  */
-export async function startProcess(args) {
+export async function startProcess(args, maxWaitMs = MAX_PROCESS_WAIT_MS) {
     const parsed = StartProcessArgsSchema.safeParse(args);
     if (!parsed.success) {
         capture('server_start_process_failed');
@@ -89,7 +131,9 @@ export async function startProcess(args) {
         };
     }
     try {
-        const commands = commandManager.extractCommands(parsed.data.command).join(', ');
+        // Each command's first word as typed, so telemetry replaces a path whole
+        // (the base name alone would send the last part of it)
+        const commands = commandManager.extractCommands(parsed.data.command, true).join(', ');
         capture('server_start_process', {
             command: commandManager.getBaseCommand(parsed.data.command),
             commands: commands
@@ -105,6 +149,7 @@ export async function startProcess(args) {
         return {
             content: [{ type: "text", text: `Error: Command not allowed: ${parsed.data.command}` }],
             isError: true,
+            structuredContent: { blocked: true, command: parsed.data.command },
         };
     }
     const commandToRun = parsed.data.command;
@@ -127,36 +172,23 @@ export async function startProcess(args) {
 
 🔄 Ready for code - send complete self-contained script via interact_with_process.`
                 }],
+            structuredContent: { pid: virtualPid, status: 'waiting_for_input' },
         };
     }
     let shellUsed = parsed.data.shell;
     if (!shellUsed) {
         const config = await configManager.getConfig();
-        if (config.defaultShell) {
-            shellUsed = config.defaultShell;
-        }
-        else {
-            const isWindows = os.platform() === 'win32';
-            if (isWindows && process.env.COMSPEC) {
-                shellUsed = process.env.COMSPEC;
-            }
-            else if (!isWindows && process.env.SHELL) {
-                shellUsed = process.env.SHELL;
-            }
-            else {
-                shellUsed = isWindows ? 'cmd.exe' : '/bin/sh';
-            }
-        }
+        shellUsed = config.defaultShell || getDefaultShell();
     }
-    const result = await terminalManager.executeCommand(commandToRun, parsed.data.timeout_ms, shellUsed, parsed.data.verbose_timing || false);
+    const result = await terminalManager.executeCommand(commandToRun, parsed.data.timeout_ms, shellUsed, parsed.data.verbose_timing || false, maxWaitMs);
     if (result.pid === -1) {
         return {
             content: [{ type: "text", text: result.output }],
             isError: true,
         };
     }
-    // Analyze the process state to detect if it's waiting for input
-    const processState = analyzeProcessState(result.output, result.pid);
+    // Whether the process is waiting for input, as detected when the wait ended
+    const { processState } = result;
     let statusMessage = '';
     if (processState.isWaitingForInput) {
         statusMessage = `\n🔄 ${formatProcessStateMessage(processState, result.pid)}`;
@@ -177,7 +209,34 @@ export async function startProcess(args) {
                 type: "text",
                 text: `Process started with PID ${result.pid} (shell: ${shellUsed})\nInitial output:\n${result.output}${statusMessage}${timingMessage}`
             }],
+        structuredContent: {
+            pid: result.pid,
+            shell: shellUsed,
+            status: getProcessStatus(processState),
+            ...getWaitCapFields(result.waitCappedAtMs),
+        },
     };
+}
+/**
+ * Machine-readable process state for structuredContent, mirroring the
+ * status line shown in the text response.
+ */
+function getProcessStatus(state, timedOut = false) {
+    if (state.isWaitingForInput)
+        return 'waiting_for_input';
+    if (state.isFinished)
+        return 'finished';
+    return timedOut ? 'timeout' : 'running';
+}
+/**
+ * structuredContent fields telling the caller whether the wait ceiling
+ * (not timeout_ms) ended the wait. When it did, status is 'running'
+ * and the caller continues with read_process_output.
+ */
+function getWaitCapFields(waitCappedAtMs) {
+    return waitCappedAtMs !== undefined
+        ? { waitCapped: true, waitLimitMs: waitCappedAtMs }
+        : { waitCapped: false };
 }
 function formatTimingInfo(timing) {
     let msg = '\n\n📊 Timing Information:\n';
@@ -204,8 +263,10 @@ function formatTimingInfo(timing) {
 /**
  * Read output from a running process with file-like pagination
  * Supports offset/length parameters for controlled reading
+ * maxWaitMs: ceiling for this call's wait. The tools always use MAX_PROCESS_WAIT_MS;
+ * only in-process callers (tests) pass a smaller one. Not part of the tool schema.
  */
-export async function readProcessOutput(args) {
+export async function readProcessOutput(args, maxWaitMs = MAX_PROCESS_WAIT_MS) {
     const parsed = ReadProcessOutputArgsSchema.safeParse(args);
     if (!parsed.success) {
         return {
@@ -221,6 +282,7 @@ export async function readProcessOutput(args) {
     verbose_timing = false } = parsed.data;
     // Timing telemetry
     const startTime = Date.now();
+    const { waitMs } = getProcessWaitLimit(timeout_ms, maxWaitMs);
     // For active sessions with no new output yet, optionally wait for output
     const session = terminalManager.getSession(pid);
     if (session && offset === 0) {
@@ -228,8 +290,7 @@ export async function readProcessOutput(args) {
         const waitForOutput = () => {
             return new Promise((resolve) => {
                 // Check if there's already new output
-                const currentLines = terminalManager.getOutputLineCount(pid) || 0;
-                if (currentLines > session.lastReadIndex) {
+                if (terminalManager.hasUnreadOutput(pid)) {
                     resolve();
                     return;
                 }
@@ -249,17 +310,17 @@ export async function readProcessOutput(args) {
                     cleanup();
                     resolve();
                 };
-                // Poll for new output
+                // Poll for new output, or for the exit (the session is then no
+                // longer active): a process that exited writes nothing more itself
                 interval = setInterval(() => {
-                    const newLineCount = terminalManager.getOutputLineCount(pid) || 0;
-                    if (newLineCount > session.lastReadIndex) {
+                    if (terminalManager.hasUnreadOutput(pid) || !terminalManager.getSession(pid)) {
                         resolveOnce();
                     }
                 }, 50);
                 // Timeout
                 timeout = setTimeout(() => {
                     resolveOnce();
-                }, timeout_ms);
+                }, waitMs);
             });
         };
         await waitForOutput();
@@ -306,13 +367,14 @@ export async function readProcessOutput(args) {
         const runtimeStr = result.runtimeMs !== undefined
             ? ` (runtime: ${(result.runtimeMs / 1000).toFixed(2)}s)`
             : '';
-        processStateMessage = `\n✅ Process completed with exit code ${result.exitCode}${runtimeStr}`;
+        // A process ended by a signal has no exit code: name the signal instead of "exit code null"
+        const ending = result.exitCode === null && result.signal ? `signal ${result.signal}` : `exit code ${result.exitCode}`;
+        processStateMessage = `\n✅ Process completed with ${ending}${runtimeStr}`;
     }
     else if (session) {
         // Analyze state for running processes
-        const fullOutput = session.outputLines.join('\n');
-        const processState = analyzeProcessState(fullOutput, pid);
-        if (processState.isWaitingForInput) {
+        const processState = terminalManager.getProcessState(pid);
+        if (processState?.isWaitingForInput) {
             processStateMessage = `\n🔄 ${formatProcessStateMessage(processState, pid)}`;
         }
     }
@@ -333,8 +395,10 @@ export async function readProcessOutput(args) {
 /**
  * Interact with a running process (renamed from send_input)
  * Automatically detects when process is ready and returns output
+ * maxWaitMs: ceiling for this call's wait. The tools always use MAX_PROCESS_WAIT_MS;
+ * only in-process callers (tests) pass a smaller one. Not part of the tool schema.
  */
-export async function interactWithProcess(args) {
+export async function interactWithProcess(args, maxWaitMs = MAX_PROCESS_WAIT_MS) {
     const parsed = InteractWithProcessArgsSchema.safeParse(args);
     if (!parsed.success) {
         capture('server_interact_with_process_failed', {
@@ -349,6 +413,7 @@ export async function interactWithProcess(args) {
     // Get config for output line limit
     const config = await configManager.getConfig();
     const maxOutputLines = config.fileReadLineLimit ?? 1000;
+    const waitLimit = getProcessWaitLimit(timeout_ms, maxWaitMs);
     // Check if this is a virtual Node session (node:local)
     if (virtualNodeSessions.has(pid)) {
         const session = virtualNodeSessions.get(pid);
@@ -358,8 +423,10 @@ export async function interactWithProcess(args) {
         });
         // Execute code via temp file approach
         // Respect per-call timeout if provided, otherwise use session default
-        const effectiveTimeout = timeout_ms ?? session.timeout_ms;
-        return executeNodeCode(input, effectiveTimeout);
+        // (parsed.data's: timeout_ms above already holds the 8000ms default for processes),
+        // within the process wait ceiling: the call answers only once the script ends
+        const effectiveTimeout = Math.min(parsed.data.timeout_ms ?? session.timeout_ms, waitLimit.capMs);
+        return executeNodeCode(input, effectiveTimeout, pid);
     }
     // Timing telemetry
     const startTime = Date.now();
@@ -375,7 +442,10 @@ export async function interactWithProcess(args) {
         // Capture output snapshot BEFORE sending input
         // This handles REPLs where output is appended to the prompt line
         const outputSnapshot = terminalManager.captureOutputSnapshot(pid);
-        const success = terminalManager.sendInputToProcess(pid, input);
+        // Only a process that reads its input at a prompt prints prompts in its output
+        const readAtPrompt = terminalManager.getProcessState(pid)?.isWaitingForInput ?? false;
+        // No snapshot means no active session, which can't take input either
+        const success = outputSnapshot !== null && terminalManager.sendInputToProcess(pid, input);
         if (!success) {
             return {
                 content: [{ type: "text", text: `Error: Failed to send input to process ${pid}. The process may have exited or doesn't accept input.` }],
@@ -405,22 +475,25 @@ export async function interactWithProcess(args) {
                         type: "text",
                         text: `✅ Input sent to process ${pid}. Use read_process_output to get the response.${timingMessage}`
                     }],
+                // Not waited for: no output was read
+                structuredContent: { pid, status: 'running', truncated: false, shownLines: 0, totalLines: 0 },
             };
         }
         // Smart waiting with immediate and periodic detection
         let output = "";
         let processState;
         let earlyExit = false;
-        // Quick prompt patterns for immediate detection
-        const quickPromptPatterns = />>>\s*$|>\s*$|\$\s*$|#\s*$/;
+        let waitCapped = false;
         const waitForResponse = () => {
             return new Promise((resolve) => {
                 let resolved = false;
-                let attempts = 0;
                 const pollIntervalMs = 50; // Poll every 50ms for faster response
-                const maxAttempts = Math.ceil(timeout_ms / pollIntervalMs);
+                // A deadline, not a poll count, so a busy event loop can't stretch the wait past the ceiling
+                const deadline = Date.now() + waitLimit.waitMs;
                 let interval = null;
-                let lastOutputLength = 0; // Track output length to detect new output
+                // Advances every poll, so each poll reads only the output that arrived since the
+                // previous one (snapshot-based, which handles REPL prompt line appending)
+                let readPosition = outputSnapshot;
                 let resolveOnce = () => {
                     if (resolved)
                         return;
@@ -433,11 +506,11 @@ export async function interactWithProcess(args) {
                 interval = setInterval(() => {
                     if (resolved)
                         return;
-                    // Use snapshot-based reading to handle REPL prompt line appending
-                    const newOutput = outputSnapshot
-                        ? terminalManager.getOutputSinceSnapshot(pid, outputSnapshot)
-                        : terminalManager.getNewOutput(pid);
-                    if (newOutput && newOutput.length > lastOutputLength) {
+                    const read = terminalManager.readOutputSince(pid, readPosition);
+                    if (read)
+                        readPosition = read.next;
+                    const newOutput = read?.output ?? '';
+                    if (newOutput.length > 0) {
                         const now = Date.now();
                         if (!firstOutputTime)
                             firstOutputTime = now;
@@ -447,14 +520,17 @@ export async function interactWithProcess(args) {
                                 timestamp: now,
                                 deltaMs: now - startTime,
                                 source: 'periodic_poll',
-                                length: newOutput.length - lastOutputLength,
-                                snippet: newOutput.slice(lastOutputLength, lastOutputLength + 50).replace(/\n/g, '\\n')
+                                length: newOutput.length,
+                                snippet: newOutput.slice(0, 50).replace(/\n/g, '\\n')
                             });
                         }
-                        output = newOutput; // Replace with full output since snapshot
-                        lastOutputLength = newOutput.length;
-                        // Analyze current state
-                        processState = analyzeProcessState(output, pid);
+                        // Full output since the snapshot, bounded like the session buffer it came from
+                        output += newOutput;
+                        if (output.length > MAX_BUFFERED_OUTPUT_CHARS) {
+                            output = output.slice(-MAX_BUFFERED_OUTPUT_CHARS);
+                        }
+                        // Analyze current state from the end of the output since the snapshot
+                        processState = terminalManager.getProcessState(pid, outputSnapshot) ?? analyzeProcessState(output, pid);
                         // Exit early if we detect the process is waiting for input
                         if (processState.isWaitingForInput) {
                             earlyExit = true;
@@ -465,16 +541,19 @@ export async function interactWithProcess(args) {
                             resolveOnce();
                             return;
                         }
-                        // Also exit if process finished
-                        if (processState.isFinished) {
-                            exitReason = 'process_finished';
-                            resolveOnce();
-                            return;
-                        }
                     }
-                    attempts++;
-                    if (attempts >= maxAttempts) {
+                    // Also exit once the process has exited, whether or not it wrote
+                    // anything since the previous poll: no answer can come any more
+                    const state = terminalManager.getProcessState(pid, outputSnapshot);
+                    if (state?.isFinished) {
+                        processState = state;
+                        exitReason = 'process_finished';
+                        resolveOnce();
+                        return;
+                    }
+                    if (Date.now() >= deadline) {
                         exitReason = 'timeout';
+                        waitCapped = waitLimit.capped;
                         resolveOnce();
                     }
                 }, pollIntervalMs);
@@ -482,11 +561,13 @@ export async function interactWithProcess(args) {
         };
         await waitForResponse();
         // Clean and format output
-        let cleanOutput = cleanProcessOutput(output, input);
+        let cleanOutput = cleanProcessOutput(output, input, readAtPrompt);
         const timeoutReached = !earlyExit && !processState?.isFinished && !processState?.isWaitingForInput;
         // Apply output line limit to prevent context overflow
         let truncationMessage = '';
         const outputLines = cleanOutput.split('\n');
+        const totalLines = cleanOutput.trim().length > 0 ? outputLines.length : 0;
+        const shownLines = Math.min(totalLines, maxOutputLines);
         if (outputLines.length > maxOutputLines) {
             const truncatedLines = outputLines.slice(0, maxOutputLines);
             cleanOutput = truncatedLines.join('\n');
@@ -495,7 +576,7 @@ export async function interactWithProcess(args) {
         }
         // Determine final state
         if (!processState) {
-            processState = analyzeProcessState(output, pid);
+            processState = terminalManager.getProcessState(pid, outputSnapshot) ?? analyzeProcessState(output, pid);
         }
         let statusMessage = '';
         if (processState.isWaitingForInput) {
@@ -523,12 +604,23 @@ export async function interactWithProcess(args) {
             };
             timingMessage = formatTimingInfo(timingInfo);
         }
+        // A capped wait didn't reach the caller's timeout_ms: the process is still
+        // running and the caller continues with read_process_output
+        const structuredContent = {
+            pid,
+            status: getProcessStatus(processState, timeoutReached && !waitCapped),
+            truncated: totalLines > shownLines,
+            shownLines,
+            totalLines,
+            ...getWaitCapFields(timeoutReached && waitCapped ? waitLimit.capMs : undefined),
+        };
         if (cleanOutput.trim().length === 0 && !timeoutReached) {
             return {
                 content: [{
                         type: "text",
                         text: `✅ Input executed in process ${pid}.\n📭 (No output produced)${statusMessage}${timingMessage}`
                     }],
+                structuredContent,
             };
         }
         // Format response with better structure and consistent emojis
@@ -553,6 +645,7 @@ export async function interactWithProcess(args) {
                     type: "text",
                     text: responseText
                 }],
+            structuredContent,
         };
     }
     catch (error) {
@@ -588,11 +681,15 @@ export async function forceTerminate(args) {
                 }],
         };
     }
-    const success = terminalManager.forceTerminate(pid);
+    // Returns once the session's processes are gone, so a success means they no longer run
+    const outcome = await terminalManager.forceTerminate(pid);
+    if (outcome === 'failed') {
+        return terminationFailedResult(pid);
+    }
     return {
         content: [{
                 type: "text",
-                text: success
+                text: outcome === 'terminated'
                     ? `Successfully initiated termination of session ${pid}`
                     : `No active session found for PID ${pid}`
             }],
@@ -619,5 +716,11 @@ export async function listSessions() {
                     ? 'No active sessions'
                     : allSessions.join('\n')
             }],
+        structuredContent: {
+            sessions: [
+                ...sessions.map(s => ({ pid: s.pid, type: 'process', isBlocked: s.isBlocked, runtimeMs: s.runtime })),
+                ...virtualSessions.map(s => ({ pid: s.pid, type: s.type, timeoutMs: s.timeout_ms })),
+            ],
+        },
     };
 }

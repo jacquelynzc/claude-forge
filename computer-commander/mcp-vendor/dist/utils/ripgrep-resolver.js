@@ -1,7 +1,7 @@
-import { execSync } from 'child_process';
 import { existsSync, chmodSync } from 'fs';
 import path from 'path';
 import os from 'os';
+import { resolveShellPath } from './shell.js';
 let cachedRgPath = null;
 /**
  * Resolve ripgrep binary path with multiple fallback strategies
@@ -31,23 +31,18 @@ export async function getRipgrepPath() {
     catch (e) {
         // @vscode/ripgrep import or binary resolution failed, continue to fallbacks
     }
-    // Strategy 2: Try system ripgrep using 'which' (Unix) or 'where' (Windows)
-    try {
-        const systemRg = process.platform === 'win32' ? 'rg.exe' : 'rg';
-        const whichCmd = process.platform === 'win32' ? 'where' : 'which';
-        const result = execSync(`${whichCmd} ${systemRg}`, { encoding: 'utf-8' }).trim().split(/\r?\n/)[0];
-        if (result && existsSync(result)) {
-            cachedRgPath = result;
-            return result;
-        }
-    }
-    catch (e) {
-        // System rg not found via which
+    // Strategy 2: system ripgrep on PATH (never the working folder, which
+    // 'where' searched first on Windows)
+    const systemRg = resolveShellPath(process.platform === 'win32' ? 'rg.exe' : 'rg');
+    if (systemRg) {
+        cachedRgPath = systemRg;
+        return systemRg;
     }
     // Strategy 3: Try common installation paths
     const commonPaths = [];
     if (process.platform === 'win32') {
-        commonPaths.push('C:\\Program Files\\Ripgrep\\rg.exe', 'C:\\Program Files (x86)\\Ripgrep\\rg.exe', path.join(os.homedir(), 'scoop', 'apps', 'ripgrep', 'current', 'rg.exe'), path.join(os.homedir(), '.cargo', 'bin', 'rg.exe'));
+        // Windows' own Program Files folders, which aren't always on C:
+        commonPaths.push(path.join(process.env.ProgramFiles ?? 'C:\\Program Files', 'Ripgrep', 'rg.exe'), path.join(process.env['ProgramFiles(x86)'] ?? 'C:\\Program Files (x86)', 'Ripgrep', 'rg.exe'), path.join(os.homedir(), 'scoop', 'apps', 'ripgrep', 'current', 'rg.exe'), path.join(os.homedir(), '.cargo', 'bin', 'rg.exe'));
     }
     else {
         commonPaths.push('/usr/local/bin/rg', '/usr/bin/rg', path.join(os.homedir(), '.cargo', 'bin', 'rg'), '/opt/homebrew/bin/rg' // Apple Silicon Homebrew

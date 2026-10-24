@@ -65,7 +65,7 @@ export declare function getConfig(): Promise<{
             availableShells: string[];
         };
         entries: {
-            key: "defaultShell" | "blockedCommands" | "allowedDirectories" | "telemetryEnabled" | "fileReadLineLimit" | "fileWriteLineLimit";
+            key: "blockedCommands" | "defaultShell" | "allowedDirectories" | "telemetryEnabled" | "fileWriteLineLimit" | "fileReadLineLimit";
             value: unknown;
             valueType: "string" | "number" | "boolean" | "array";
             editable: boolean;

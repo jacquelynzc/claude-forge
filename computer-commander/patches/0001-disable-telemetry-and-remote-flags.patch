@@ -1,19 +1,21 @@
+diff --git a/src/utils/capture.ts b/src/utils/capture.ts
+index 26f576a..c72f9f5 100644
 --- a/src/utils/capture.ts
 +++ b/src/utils/capture.ts
-@@ -11,6 +11,12 @@
- // produces zero telemetry. AsyncLocalStorage (rather than a module-level flag)
+@@ -13,6 +13,12 @@ import { currentClient, currentCallIsRemote, currentRemoteClient } from '../serv
  // keeps attribution correct when a widget call interleaves with an agent call.
  const uiOriginCallContext = new AsyncLocalStorage<boolean>();
-+
+ 
 +// LOCAL FORK PATCH: returns true always. It is a function, not a const, so
 +// TypeScript cannot fold it - the disabled function bodies below stay
 +// reachable for control-flow analysis. An unconditional `return` there breaks
 +// narrowing, makes tsc exit 2, and silently halts the rest of the build chain.
 +function __forkDisabled(): boolean { return true; }
- 
++
  export function runInUiOriginCallContext<T>(fn: () => T): T {
      return uiOriginCallContext.run(true, fn);
-@@ -48,6 +54,8 @@
+ }
+@@ -69,6 +75,8 @@ const TELEMETRY_PROXY_FALLBACK_URL = 'https://dc-telemetry-proxy-83847352264.eur
   * Set DESKTOP_COMMANDER_DISABLE_TELEMETRY to 1/true/yes/on to disable.
   */
  export function isTelemetryDisabledByEnv(): boolean {
@@ -22,7 +24,7 @@
      const raw = process.env.DESKTOP_COMMANDER_DISABLE_TELEMETRY;
      if (!raw) return false;
      return ['1', 'true', 'yes', 'on'].includes(raw.trim().toLowerCase());
-@@ -97,6 +105,8 @@
+@@ -245,6 +253,8 @@ function sanitizeEventProperties(properties?: any, knownPaths: readonly string[]
  // removal (only referenced in a comment). It still carries the full GA4-flavored
  // send path. Remove it, or repurpose it as the shared proxy transport.
  export const captureBase = async (captureURL: string, event: string, properties?: any) => {
@@ -31,15 +33,45 @@
      try {
          // Env kill-switch takes precedence over config (tests/CI).
          if (isTelemetryDisabledByEnv()) {
-@@ -480,6 +490,8 @@
+@@ -527,6 +537,9 @@ export const buildEventProperties = async (properties?: any) => {
+  * Uses the custom domain first and retries the generated Cloud Run URL on failure.
+  */
+ const sendToTelemetryProxy = async (event: string, eventProperties: any) => {
++    // LOCAL FORK PATCH: transport-level kill. Every sender (capture, captureTransport, anything
++    // upstream adds later on the proxy transport) ends here. Do not remove.
++    if (__forkDisabled()) return;
+     try {
+         if (isTelemetryDisabledByEnv()) return;
+         const telemetryEnabled = await configManager.getValue('telemetryEnabled');
+@@ -551,6 +564,8 @@ const sendToTelemetryProxy = async (event: string, eventProperties: any) => {
+ };
+ 
+ const postTelemetryPayload = async (endpoint: string, payload: string): Promise<boolean> => {
++    // LOCAL FORK PATCH: the only https.request to the telemetry proxy. Do not remove.
++    if (__forkDisabled()) return false;
+     return await new Promise((resolve) => {
+         const url = new URL(endpoint);
+         const options = {
+@@ -584,6 +599,8 @@ const postTelemetryPayload = async (endpoint: string, payload: string): Promise<
  // can be silently dropped. If we need delivery guarantees on short-lived paths,
  // expose an awaitable variant or flush-before-exit hook.
  export const capture = async (event: string, properties?: any) => {
 +    // LOCAL FORK PATCH: telemetry disabled at source. Do not remove.
 +    if (__forkDisabled()) return;
-     // Tool calls fired programmatically by the widget UIs must produce zero
-     // telemetry — drop every event raised while serving one.
-     if (isInsideUiOriginCall()) {
+     // Drop UI-origin calls and explicit opt-outs before preparing an event.
+     if (isInsideUiOriginCall() || isTelemetryDisabledByEnv()) {
+         return;
+@@ -603,6 +620,8 @@ export const capture = async (event: string, properties?: any) => {
+  * redacted like every other event (known paths, path properties, error text).
+  */
+ export const captureTransport = async (event: string, properties: TransportParams) => {
++    // LOCAL FORK PATCH: telemetry disabled at source. Do not remove.
++    if (__forkDisabled()) return;
+     if (isInsideUiOriginCall() || isTelemetryDisabledByEnv()) return;
+     void (async () => {
+         try {
+diff --git a/src/utils/feature-flags.ts b/src/utils/feature-flags.ts
+index e530bd7..0600c1a 100644
 --- a/src/utils/feature-flags.ts
 +++ b/src/utils/feature-flags.ts
 @@ -1,3 +1,9 @@
@@ -52,7 +84,7 @@
  import fs from 'fs/promises';
  import path from 'path';
  import { existsSync } from 'fs';
-@@ -163,6 +169,8 @@
+@@ -164,6 +170,8 @@ class FeatureFlagManager {
     * Fetch flags from remote URL
     */
    private async fetchFlags(): Promise<void> {

@@ -8,6 +8,7 @@ import path from 'path';
 import { existsSync } from 'fs';
 import { CONFIG_FILE } from '../config.js';
 import { logger } from './logger.js';
+import { writeFileAtomic } from './atomic-write.js';
 class FeatureFlagManager {
     constructor() {
         this.flags = {};
@@ -202,7 +203,7 @@ class FeatureFlagManager {
             if (!existsSync(configDir)) {
                 await fs.mkdir(configDir, { recursive: true });
             }
-            await fs.writeFile(this.cachePath, JSON.stringify(config, null, 2), 'utf8');
+            await writeFileAtomic(this.cachePath, JSON.stringify(config, null, 2));
             // Don't log here - this runs async and can cause issues with MCP clients
         }
         catch (error) {

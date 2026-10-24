@@ -16,7 +16,8 @@
  * Round-trip: DOCX → unzip → pretty-print → [outline or raw] → edit → compact → repack
  */
 import fs from 'fs/promises';
-import PizZip from 'pizzip';
+import { createRequire } from 'module';
+import { LazyPackage } from '../lazy-package.js';
 // ════════════════════════════════════════════════════════════════
 // XML Pretty-Print / Compact
 // ════════════════════════════════════════════════════════════════
@@ -51,8 +52,15 @@ function prettyPrintXml(xml) {
 function compactXml(prettyXml) {
     return prettyXml.split('\n').map(l => l.trimStart()).join('');
 }
+const require = createRequire(import.meta.url);
+export const pizzipPackage = new LazyPackage('pizzip', 'DOCX support', () => require('pizzip'));
+/** Opens a zip from its bytes, or a new, empty one */
+function openZip(data) {
+    const PizZipClass = pizzipPackage.load();
+    return data === undefined ? new PizZipClass() : new PizZipClass(data);
+}
 function loadDocxZip(buf) {
-    const zip = new PizZip(buf);
+    const zip = openZip(buf);
     const docFile = zip.file('word/document.xml');
     if (!docFile)
         throw new Error('Invalid DOCX: missing word/document.xml');
@@ -367,6 +375,11 @@ function splitTopLevelElements(xml) {
     }
     return elements.filter(e => e.length > 0);
 }
+/** A header or footer part (word/header1.xml, word/footer4.xml, …), of any section */
+function isHeaderFooterPart(relativePath) {
+    return (relativePath.startsWith('word/header') || relativePath.startsWith('word/footer'))
+        && relativePath.endsWith('.xml');
+}
 /**
  * Extract outline info for headers and footers from the DOCX zip.
  */
@@ -374,8 +387,7 @@ function extractHeaderFooterOutline(zip) {
     const parts = [];
     const zipFiles = zip.files;
     for (const relativePath of Object.keys(zipFiles)) {
-        if ((relativePath.startsWith('word/header') || relativePath.startsWith('word/footer'))
-            && relativePath.endsWith('.xml')) {
+        if (isHeaderFooterPart(relativePath)) {
             try {
                 const xml = zipFiles[relativePath].asText();
                 const text = extractAllText(xml);
@@ -400,7 +412,7 @@ function escapeXml(text) {
         .replace(/"/g, '&quot;').replace(/'/g, '&apos;');
 }
 function createMinimalDocxZip(documentXml) {
-    const zip = new PizZip();
+    const zip = openZip();
     zip.file('[Content_Types].xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
         `<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">` +
         `<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>` +
@@ -568,7 +580,7 @@ export class DocxFileHandler {
             }
             // Load and pretty-print
             const buf = await fs.readFile(path);
-            const zip = new PizZip(buf);
+            const zip = openZip(buf);
             const docFile = zip.file('word/document.xml');
             if (!docFile)
                 throw new Error('Invalid DOCX: missing word/document.xml');
@@ -578,10 +590,13 @@ export class DocxFileHandler {
             let targetPretty = pretty;
             let targetFile = 'word/document.xml';
             let matchCount = countOccurrences(pretty, oldStr);
-            // If not found in document.xml, search through headers/footers
+            // If not found in document.xml, search through headers/footers: every section's
+            // (Word numbers them across sections), headers first, each in number order
             if (matchCount === 0) {
-                const xmlFiles = ['word/header1.xml', 'word/header2.xml', 'word/header3.xml',
-                    'word/footer1.xml', 'word/footer2.xml', 'word/footer3.xml'];
+                const partNumber = (name) => Number(/(\d+)\.xml$/.exec(name)?.[1] ?? 0);
+                const isFooter = (name) => (name.startsWith('word/footer') ? 1 : 0);
+                const xmlFiles = Object.keys(zip.files).filter(isHeaderFooterPart)
+                    .sort((a, b) => isFooter(a) - isFooter(b) || partNumber(a) - partNumber(b));
                 for (const xmlPath of xmlFiles) {
                     const f = zip.file(xmlPath);
                     if (!f)

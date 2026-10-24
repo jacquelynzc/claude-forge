@@ -67,7 +67,7 @@ export declare const ForceTerminateArgsSchema: z.ZodObject<{
 }>;
 export declare const ListSessionsArgsSchema: z.ZodObject<{}, "strip", z.ZodTypeAny, {}, {}>;
 export declare const KillProcessArgsSchema: z.ZodObject<{
-    pid: z.ZodNumber;
+    pid: z.ZodEffects<z.ZodNumber, number, number>;
 }, "strip", z.ZodTypeAny, {
     pid: number;
 }, {
@@ -407,16 +407,6 @@ export declare const StopSearchArgsSchema: z.ZodObject<{
     sessionId: string;
 }>;
 export declare const ListSearchesArgsSchema: z.ZodObject<{}, "strip", z.ZodTypeAny, {}, {}>;
-export declare const GetPromptsArgsSchema: z.ZodObject<{
-    action: z.ZodEnum<["get_prompt"]>;
-    promptId: z.ZodString;
-}, "strip", z.ZodTypeAny, {
-    action: "get_prompt";
-    promptId: string;
-}, {
-    action: "get_prompt";
-    promptId: string;
-}>;
 export declare const GetRecentToolCallsArgsSchema: z.ZodObject<{
     maxResults: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
     toolName: z.ZodOptional<z.ZodString>;

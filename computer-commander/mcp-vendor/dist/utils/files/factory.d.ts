@@ -22,9 +22,12 @@ import { FileHandler } from './base.js';
  * 6. Text files (default)
  *
  * @param filePath File path to get handler for
+ * @param options svgAsImage: an SVG goes to the image handler, for the file preview widget
  * @returns FileHandler instance that can handle this file
  */
-export declare function getFileHandler(filePath: string): Promise<FileHandler>;
+export declare function getFileHandler(filePath: string, options?: {
+    svgAsImage?: boolean;
+}): Promise<FileHandler>;
 /**
  * Check if a file path is an Excel file
  * Delegates to ExcelFileHandler.canHandle to avoid duplicating extension logic
@@ -39,3 +42,21 @@ export declare function isExcelFile(path: string): boolean;
  * @returns true if file is an image format
  */
 export declare function isImageFile(path: string): boolean;
+export type FileAction = 'read' | 'write' | 'edit';
+/**
+ * Right after initialize (#777): the packages Excel, DOCX and PDF files need,
+ * loaded in the background one at a time, smaller first, so each pause of the
+ * main thread is one package.
+ */
+export declare function preloadFileSupport(): void;
+/**
+ * The answer for a tool call that would `action` `filePath` while a package it
+ * needs is still loading, naming the file; undefined once loaded. A package
+ * not preloading yet (before initialize, or after a failure) starts here,
+ * after the call has answered. `isPdf` for a PDF whatever its name (write_pdf),
+ * `isUrl` for a URL read.
+ */
+export declare function stillLoadingError(filePath: string, action: FileAction, { isPdf, isUrl }?: {
+    isPdf?: boolean;
+    isUrl?: boolean;
+}): string | undefined;

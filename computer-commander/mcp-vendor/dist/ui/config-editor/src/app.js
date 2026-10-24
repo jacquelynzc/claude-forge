@@ -241,25 +241,12 @@ function getSettingSummary(entry) {
     }
     return `${count} folder${count === 1 ? '' : 's'} allowed`;
 }
+// Shell options come only from the server (uiHints.availableShells, detected in src/utils/shell.ts).
 function getShellOptions(payload, currentShell) {
     const hintedShells = Array.isArray(payload?.uiHints?.availableShells)
         ? payload.uiHints.availableShells.filter((shell) => typeof shell === 'string' && shell.trim().length > 0)
         : [];
-    const config = payload?.config;
-    const systemInfo = isObjectRecord(config?.systemInfo) ? config.systemInfo : null;
-    const isWindows = Boolean(systemInfo && systemInfo.isWindows === true);
-    const isMacOS = Boolean(systemInfo && systemInfo.isMacOS === true);
-    const baseOptions = hintedShells.length > 0
-        ? hintedShells
-        : isWindows
-            ? ['powershell.exe', 'pwsh.exe', 'cmd.exe', 'bash.exe']
-            : isMacOS
-                ? ['/bin/zsh', '/bin/bash', '/bin/sh', '/usr/bin/fish', 'zsh', 'bash', 'sh', 'fish']
-                : ['/bin/bash', '/bin/sh', '/usr/bin/fish', '/bin/zsh', 'bash', 'sh', 'fish', 'zsh'];
-    const options = new Set();
-    for (const shell of baseOptions) {
-        options.add(shell);
-    }
+    const options = new Set(hintedShells);
     if (currentShell.trim().length > 0) {
         options.add(currentShell);
     }

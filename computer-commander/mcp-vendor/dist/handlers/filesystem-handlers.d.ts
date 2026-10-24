@@ -11,7 +11,7 @@ export declare function handleReadFile(args: unknown): Promise<ServerResult>;
 /**
  * Handle read_multiple_files command
  */
-export declare function handleReadMultipleFiles(args: unknown): Promise<ServerResult>;
+export declare function handleReadMultipleFiles(args: unknown, stillLoadingError?: (filePath: string) => string | undefined): Promise<ServerResult>;
 /**
  * Handle write_file command
  */

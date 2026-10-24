@@ -1,14 +1,24 @@
 import fs from 'fs/promises';
 import { createRequire } from 'module';
+import { LazyPackage } from '../../utils/lazy-package.js';
 import { normalizePageIndexes } from './utils.js';
 import { parseMarkdownToPdf } from './markdown.js';
 // Use createRequire to load pdf-lib as CJS (works around Node 25 ESM resolution issues)
 const require = createRequire(import.meta.url);
-const { PDFDocument } = require('pdf-lib');
+export const pdfLibPackage = new LazyPackage('pdf-lib', 'PDF editing support', () => require('pdf-lib'));
 async function loadPdfDocumentFromBuffer(filePathOrBuffer) {
+    const { PDFDocument } = pdfLibPackage.load();
     const buffer = typeof filePathOrBuffer === 'string' ? await fs.readFile(filePathOrBuffer) : filePathOrBuffer;
     const pdfBytes = new Uint8Array(buffer);
     return await PDFDocument.load(pdfBytes);
+}
+/**
+ * The render options for an inserted page's markdown: the call's options, with
+ * the page size and margins of the original first page (pageLayout), then the
+ * call's pdf_options, then the insert's own pdfOptions, each over the one before.
+ */
+export function insertRenderOptions(op, options = {}, pageLayout) {
+    return { ...options, pdf_options: { ...pageLayout, ...options.pdf_options, ...op.pdfOptions } };
 }
 /**
  * Delete pages from a PDF document
@@ -17,6 +27,10 @@ async function loadPdfDocumentFromBuffer(filePathOrBuffer) {
  */
 function deletePages(pdfDoc, pageIndexes) {
     const pageCount = pdfDoc.getPageCount();
+    // A page that doesn't exist is an error, as for an insert: nothing is deleted
+    if (pageIndexes.some(idx => !Number.isInteger(idx) || idx >= pageCount || idx < -pageCount)) {
+        throw new Error('Invalid page index');
+    }
     // Transform negative indices to absolute and filter valid ones
     const normalizedIndexes = normalizePageIndexes(pageIndexes, pageCount).sort((a, b) => b - a);
     for (const pageIndex of normalizedIndexes) {
@@ -71,7 +85,7 @@ async function insertPages(destPdfDocument, pageIndex, sourcePdfDocument) {
  * @param operations List of operations to perform
  * @returns The modified PDF as a Uint8Array
  */
-export async function editPdf(pdfPath, operations) {
+export async function editPdf(pdfPath, operations, options = {}) {
     const pdfDoc = await loadPdfDocumentFromBuffer(pdfPath);
     // Get page layout from the ORIGINAL first page
     const pageLayout = pdfDoc.getPageCount() > 0 ? getPageLayout(pdfDoc.getPage(0)) : undefined;
@@ -82,8 +96,7 @@ export async function editPdf(pdfPath, operations) {
         else if (op.type == 'insert') {
             let sourcePdfDocument;
             if (op.markdown !== undefined) {
-                const pdfOptions = pageLayout ? { pdf_options: pageLayout } : undefined;
-                const pdfBuffer = await parseMarkdownToPdf(op.markdown, pdfOptions);
+                const pdfBuffer = await parseMarkdownToPdf(op.markdown, insertRenderOptions(op, options, pageLayout));
                 sourcePdfDocument = await loadPdfDocumentFromBuffer(pdfBuffer);
             }
             else if (op.sourcePdfPath) {

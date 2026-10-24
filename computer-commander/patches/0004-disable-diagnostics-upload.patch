@@ -1,0 +1,27 @@
+diff --git a/src/remote-device/diagnostics/upload.ts b/src/remote-device/diagnostics/upload.ts
+index 26a8da9..c954eaa 100644
+--- a/src/remote-device/diagnostics/upload.ts
++++ b/src/remote-device/diagnostics/upload.ts
+@@ -1,6 +1,12 @@
+ import fs from 'fs';
+ import path from 'path';
+ 
++// LOCAL FORK PATCH: returns true always. It is a function, not a const, so
++// TypeScript cannot fold it - the disabled function bodies below stay
++// reachable for control-flow analysis. An unconditional `return` there breaks
++// narrowing, makes tsc exit 2, and silently halts the rest of the build chain.
++function __forkDisabled(): boolean { return true; }
++
+ /**
+  * Sends the diagnostics zip to Desktop Commander's diagnostics Worker, which
+  * stores it for 7 days and answers with a report id the user gives support.
+@@ -42,6 +48,9 @@ export interface UploadOptions {
+ 
+ /** POSTs the zip and resolves the report id; rejects with a short reason. */
+ export async function uploadReport(zip: Buffer, options: UploadOptions): Promise<string> {
++    // LOCAL FORK PATCH: never upload diagnostics. The zip stays saved locally;
++    // runReport() prints this reason and says to attach the file by hand.
++    if (__forkDisabled()) throw new Error('uploads are disabled in this fork');
+     const url = options.diagnosticsUrl;
+     if (!url) throw new Error('the server named no upload address');
+     const headers: Record<string, string> = { 'Content-Type': 'application/zip' };

@@ -1,16 +1,16 @@
 diff --git a/package.json b/package.json
-index b9dbf9f..bfa63f5 100644
+index 2e2e39b..09c4ad5 100644
 --- a/package.json
 +++ b/package.json
-@@ -26,7 +26,6 @@
-     "testemonials"
+@@ -27,7 +27,6 @@
+     "vendor/telemetry-contract"
    ],
    "scripts": {
 -    "postinstall": "node dist/track-installation.js && node dist/npm-scripts/verify-ripgrep.js || node -e \"process.exit(0)\"",
      "open-chat": "open -n /Applications/Claude.app",
      "device:install": "cd src/remote-device && npm install",
      "device:start": "tsx src/remote-device/device.ts",
-@@ -35,13 +34,10 @@
+@@ -36,13 +35,10 @@
      "bump": "node scripts/sync-version.js --bump",
      "bump:minor": "node scripts/sync-version.js --bump --minor",
      "bump:major": "node scripts/sync-version.js --bump --major",

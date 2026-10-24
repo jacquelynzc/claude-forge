@@ -13,6 +13,7 @@
  * search/replace logic should be moved here. See comment in src/tools/edit.ts.
  */
 import fs from "fs/promises";
+import { once } from 'events';
 import { createReadStream } from 'fs';
 import { createInterface } from 'readline';
 // TODO: Centralize these constants with filesystem.ts to avoid silent drift
@@ -24,10 +25,28 @@ const FILE_SIZE_LIMITS = {
 };
 const READ_PERFORMANCE_THRESHOLDS = {
     SMALL_READ_THRESHOLD: 100, // For very small reads
-    DEEP_OFFSET_THRESHOLD: 1000, // For byte estimation
-    SAMPLE_SIZE: 10000, // Sample size for estimation
+    DEEP_OFFSET_THRESHOLD: 1000, // Past this line, find where it starts first
     CHUNK_SIZE: 8192, // 8KB chunks for reverse reading
+    SCAN_CHUNK_SIZE: 64 * 1024, // 64KB chunks for counting line breaks forward
 };
+const LINE_FEED = 0x0a;
+const CARRIAGE_RETURN = 0x0d;
+/**
+ * The line breaks read_file reads by (readline's): LF, CRLF as one break, and
+ * a lone CR. True when a line ends between two adjacent code units: the bytes
+ * of UTF-8 text (an LF or CR byte is never part of another character) or a
+ * string's characters. `after` is -1 at the end of the text.
+ */
+function lineBreakBetween(before, after) {
+    return before === LINE_FEED || (before === CARRIAGE_RETURN && after !== LINE_FEED);
+}
+function throwIfAborted(signal) {
+    if (signal?.aborted) {
+        const err = new Error('Read aborted');
+        err.code = 'ABORT_ERR';
+        throw err;
+    }
+}
 /**
  * Text file handler implementation
  * Binary detection is done at the factory level - this handler assumes file is text
@@ -101,19 +120,19 @@ export class TextFileHandler {
     // Private Helper Methods (extracted from filesystem.ts)
     // ========================================================================
     /**
-     * Count lines in text content
+     * Count lines in text content the way read_file reads them (lineBreakBetween).
+     * A line break at the very end ends the last line; it doesn't start another.
      * Made static and public for use by other modules (e.g., writeFile telemetry in filesystem.ts)
      */
     static countLines(content) {
         if (content === '')
             return 0;
-        // A file with N lines has N-1 newline characters.
-        // If the file ends with a trailing newline, don't count the empty string after it.
-        const lines = content.split('\n');
-        if (lines[lines.length - 1] === '') {
-            return lines.length - 1;
+        let lines = 1;
+        for (let i = 1; i < content.length; i++) {
+            if (lineBreakBetween(content.charCodeAt(i - 1), content.charCodeAt(i)))
+                lines++;
         }
-        return lines.length;
+        return lines;
     }
     /**
      * Get file line count (for files under size limit)
@@ -231,7 +250,7 @@ export class TextFileHandler {
             }
             else {
                 if (offset > READ_PERFORMANCE_THRESHOLDS.DEEP_OFFSET_THRESHOLD) {
-                    return await this.readFromEstimatedPosition(filePath, offset, length, mimeType, includeStatusMessage, totalLines, signal);
+                    return await this.readFromDeepOffset(filePath, offset, length, mimeType, includeStatusMessage, totalLines, signal);
                 }
                 else {
                     return await this.readFromStartWithReadline(filePath, offset, length, mimeType, includeStatusMessage, totalLines, signal);
@@ -240,62 +259,83 @@ export class TextFileHandler {
         }
     }
     /**
-     * Read last N lines efficiently by reading file backwards
+     * Read last N lines efficiently: find where they start by reading the file
+     * backwards, then read them from there as readline does for smaller files
      */
     async readLastNLinesReverse(filePath, n, mimeType, includeStatusMessage = true, fileTotalLines, signal) {
+        const start = await this.findLastLinesStart(filePath, n, signal);
+        return this.readFromEndWithReadline(filePath, n, mimeType, includeStatusMessage, fileTotalLines, signal, undefined, start);
+    }
+    /**
+     * Byte position where the last `n` lines start, found by reading 8 KB chunks
+     * backwards and finding line breaks by lineBreakBetween. A line break at the
+     * very end ends the last line instead of starting another.
+     */
+    async findLastLinesStart(filePath, n, signal) {
         const fd = await fs.open(filePath, 'r');
         try {
-            const stats = await fd.stat();
-            const fileSize = stats.size;
-            let position = fileSize;
-            let lines = [];
-            let partialLine = '';
-            while (position > 0 && lines.length < n) {
-                if (signal?.aborted) {
-                    const err = new Error('Read aborted');
-                    err.code = 'ABORT_ERR';
-                    throw err;
-                }
-                const readSize = Math.min(READ_PERFORMANCE_THRESHOLDS.CHUNK_SIZE, position);
+            const { size } = await fd.stat();
+            const buffer = Buffer.alloc(READ_PERFORMANCE_THRESHOLDS.CHUNK_SIZE);
+            let position = size;
+            let breaks = 0;
+            let after = -1; // the byte after buffer[i]; -1 at the end of the file
+            while (position > 0) {
+                throwIfAborted(signal);
+                const readSize = Math.min(buffer.length, position);
                 position -= readSize;
-                const buffer = Buffer.alloc(readSize);
                 await fd.read(buffer, 0, readSize, position);
-                const chunk = buffer.toString('utf-8');
-                const text = chunk + partialLine;
-                const chunkLines = text.split('\n');
-                partialLine = chunkLines.shift() || '';
-                lines = chunkLines.concat(lines);
+                for (let i = readSize - 1; i >= 0; i--) {
+                    const byte = buffer[i];
+                    if (after !== -1 && lineBreakBetween(byte, after) && ++breaks === n) {
+                        return position + i + 1;
+                    }
+                    after = byte;
+                }
             }
-            if (position === 0 && partialLine) {
-                lines.unshift(partialLine);
-            }
-            const result = lines.slice(-n);
-            const content = includeStatusMessage
-                ? `${this.generateEnhancedStatusMessage(result.length, -n, fileTotalLines, true)}\n\n${result.join('\n')}`
-                : result.join('\n');
-            return { content, mimeType, metadata: {} };
+            return 0;
         }
         finally {
             await fd.close();
         }
     }
     /**
+     * Run `readLines` on a readline over `filePath`, then close the file before
+     * returning, whether the read finished, stopped early or failed. rl.close()
+     * alone closes the line reader, not the file stream under it, so a read
+     * that stopped early kept the file open until the process exited.
+     */
+    async withLineReader(filePath, options, readLines) {
+        const input = createReadStream(filePath, options);
+        // Settles once the file is closed: on 'close', or on 'error', which a
+        // file stream emits after closing its file
+        const closed = once(input, 'close').catch(() => { });
+        const rl = createInterface({
+            input,
+            crlfDelay: Infinity
+        });
+        try {
+            await readLines(rl);
+        }
+        finally {
+            rl.close();
+            input.destroy();
+            await closed;
+        }
+    }
+    /**
      * Read from end using readline with circular buffer
      */
     async readFromEndWithReadline(filePath, requestedLines, mimeType, includeStatusMessage = true, fileTotalLines, signal, encoding, start) {
-        const rl = createInterface({
-            input: createReadStream(filePath, { signal, encoding, start }),
-            crlfDelay: Infinity
-        });
         const buffer = new Array(requestedLines);
         let bufferIndex = 0;
         let totalLines = 0;
-        for await (const line of rl) {
-            buffer[bufferIndex] = line;
-            bufferIndex = (bufferIndex + 1) % requestedLines;
-            totalLines++;
-        }
-        rl.close();
+        await this.withLineReader(filePath, { signal, encoding, start }, async (rl) => {
+            for await (const line of rl) {
+                buffer[bufferIndex] = line;
+                bufferIndex = (bufferIndex + 1) % requestedLines;
+                totalLines++;
+            }
+        });
         let result;
         if (totalLines >= requestedLines) {
             result = [
@@ -312,24 +352,22 @@ export class TextFileHandler {
         return { content, mimeType, metadata: {} };
     }
     /**
-     * Read from start/middle using readline
+     * Read from start/middle using readline. With `start`, reading begins at
+     * that byte, where line `startLine` begins.
      */
-    async readFromStartWithReadline(filePath, offset, length, mimeType, includeStatusMessage = true, fileTotalLines, signal, encoding, start) {
-        const rl = createInterface({
-            input: createReadStream(filePath, { signal, encoding, start }),
-            crlfDelay: Infinity
-        });
+    async readFromStartWithReadline(filePath, offset, length, mimeType, includeStatusMessage = true, fileTotalLines, signal, encoding, start, startLine = 0) {
         const result = [];
-        let lineNumber = 0;
-        for await (const line of rl) {
-            if (lineNumber >= offset && result.length < length) {
-                result.push(line);
+        let lineNumber = startLine;
+        await this.withLineReader(filePath, { signal, encoding, start }, async (rl) => {
+            for await (const line of rl) {
+                if (lineNumber >= offset && result.length < length) {
+                    result.push(line);
+                }
+                if (result.length >= length)
+                    break;
+                lineNumber++;
             }
-            if (result.length >= length)
-                break;
-            lineNumber++;
-        }
-        rl.close();
+        });
         if (includeStatusMessage) {
             const statusMessage = this.generateEnhancedStatusMessage(result.length, offset, fileTotalLines, false);
             const content = `${statusMessage}\n\n${result.join('\n')}`;
@@ -341,57 +379,42 @@ export class TextFileHandler {
         }
     }
     /**
-     * Read from estimated byte position for very large files
+     * Read from a deep offset in a very large file: find the byte where line
+     * `offset` starts, then read from there with readline
      */
-    async readFromEstimatedPosition(filePath, offset, length, mimeType, includeStatusMessage = true, fileTotalLines, signal) {
-        // First, do a quick scan to estimate lines per byte
-        const rl = createInterface({
-            input: createReadStream(filePath, { signal }),
-            crlfDelay: Infinity
-        });
-        let sampleLines = 0;
-        let bytesRead = 0;
-        for await (const line of rl) {
-            bytesRead += Buffer.byteLength(line, 'utf-8') + 1;
-            sampleLines++;
-            if (bytesRead >= READ_PERFORMANCE_THRESHOLDS.SAMPLE_SIZE)
-                break;
-        }
-        rl.close();
-        if (sampleLines === 0) {
-            return await this.readFromStartWithReadline(filePath, offset, length, mimeType, includeStatusMessage, fileTotalLines, signal);
-        }
-        // Estimate position
-        const avgLineLength = bytesRead / sampleLines;
-        const estimatedBytePosition = Math.floor(offset * avgLineLength);
+    async readFromDeepOffset(filePath, offset, length, mimeType, includeStatusMessage = true, fileTotalLines, signal) {
+        const start = await this.findLineStart(filePath, offset, signal);
+        return this.readFromStartWithReadline(filePath, offset, length, mimeType, includeStatusMessage, fileTotalLines, signal, undefined, start, offset);
+    }
+    /**
+     * Byte position where line `line` (0-based) starts, or the file size when
+     * the file has fewer lines. Counts line breaks by lineBreakBetween in raw
+     * bytes, which is much faster than reading lines.
+     */
+    async findLineStart(filePath, line, signal) {
+        if (line <= 0)
+            return 0;
         const fd = await fs.open(filePath, 'r');
         try {
-            const stats = await fd.stat();
-            const startPosition = Math.min(estimatedBytePosition, stats.size);
-            const stream = createReadStream(filePath, { start: startPosition, signal });
-            const rl2 = createInterface({
-                input: stream,
-                crlfDelay: Infinity
-            });
-            const result = [];
-            let firstLineSkipped = false;
-            for await (const line of rl2) {
-                if (!firstLineSkipped && startPosition > 0) {
-                    firstLineSkipped = true;
-                    continue;
+            const buffer = Buffer.alloc(READ_PERFORMANCE_THRESHOLDS.SCAN_CHUNK_SIZE);
+            let position = 0;
+            let breaks = 0;
+            let previous = -1;
+            for (;;) {
+                throwIfAborted(signal);
+                const { bytesRead } = await fd.read(buffer, 0, buffer.length, position);
+                if (bytesRead === 0)
+                    return position;
+                for (let i = 0; i < bytesRead; i++) {
+                    const byte = buffer[i];
+                    // A line break before this byte: the next line starts here
+                    if (lineBreakBetween(previous, byte) && ++breaks === line) {
+                        return position + i;
+                    }
+                    previous = byte;
                 }
-                if (result.length < length) {
-                    result.push(line);
-                }
-                else {
-                    break;
-                }
+                position += bytesRead;
             }
-            rl2.close();
-            const content = includeStatusMessage
-                ? `${this.generateEnhancedStatusMessage(result.length, offset, fileTotalLines, false)}\n\n${result.join('\n')}`
-                : result.join('\n');
-            return { content, mimeType, metadata: {} };
         }
         finally {
             await fd.close();

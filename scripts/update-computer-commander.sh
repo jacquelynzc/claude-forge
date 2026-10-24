@@ -42,8 +42,7 @@ build_or_die() {
 assert_dist_complete() {
   local missing=0
   for f in dist/index.js dist/data/onboarding-prompts.json \
-           dist/remote-device/scripts/blocking-offline-update.js \
-           dist/setup-claude-server.js dist/uninstall-claude-server.js; do
+           dist/remote-device/scripts/blocking-offline-update.js; do
     [ -e "$f" ] || { echo "    MISSING $f"; missing=1; }
   done
   [ "$missing" = "0" ] || { echo "    dist/ is incomplete - the build chain halted early"; exit 1; }

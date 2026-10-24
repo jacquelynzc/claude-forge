@@ -24,7 +24,8 @@ export declare class TextFileHandler implements FileHandler {
     write(path: string, content: string, mode?: 'rewrite' | 'append'): Promise<void>;
     getInfo(path: string): Promise<FileInfo>;
     /**
-     * Count lines in text content
+     * Count lines in text content the way read_file reads them (lineBreakBetween).
+     * A line break at the very end ends the last line; it doesn't start another.
      * Made static and public for use by other modules (e.g., writeFile telemetry in filesystem.ts)
      */
     static countLines(content: string): number;
@@ -46,19 +47,41 @@ export declare class TextFileHandler implements FileHandler {
      */
     private readFileWithSmartPositioning;
     /**
-     * Read last N lines efficiently by reading file backwards
+     * Read last N lines efficiently: find where they start by reading the file
+     * backwards, then read them from there as readline does for smaller files
      */
     private readLastNLinesReverse;
+    /**
+     * Byte position where the last `n` lines start, found by reading 8 KB chunks
+     * backwards and finding line breaks by lineBreakBetween. A line break at the
+     * very end ends the last line instead of starting another.
+     */
+    private findLastLinesStart;
+    /**
+     * Run `readLines` on a readline over `filePath`, then close the file before
+     * returning, whether the read finished, stopped early or failed. rl.close()
+     * alone closes the line reader, not the file stream under it, so a read
+     * that stopped early kept the file open until the process exited.
+     */
+    private withLineReader;
     /**
      * Read from end using readline with circular buffer
      */
     private readFromEndWithReadline;
     /**
-     * Read from start/middle using readline
+     * Read from start/middle using readline. With `start`, reading begins at
+     * that byte, where line `startLine` begins.
      */
     private readFromStartWithReadline;
     /**
-     * Read from estimated byte position for very large files
+     * Read from a deep offset in a very large file: find the byte where line
+     * `offset` starts, then read from there with readline
      */
-    private readFromEstimatedPosition;
+    private readFromDeepOffset;
+    /**
+     * Byte position where line `line` (0-based) starts, or the file size when
+     * the file has fewer lines. Counts line breaks by lineBreakBetween in raw
+     * bytes, which is much faster than reading lines.
+     */
+    private findLineStart;
 }

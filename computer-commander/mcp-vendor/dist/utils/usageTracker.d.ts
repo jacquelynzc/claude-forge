@@ -16,11 +16,6 @@ export interface ToolUsageStats {
     lastFeedbackPromptDate?: string;
     feedbackAttempts?: number;
 }
-export interface OnboardingState {
-    promptsUsed: boolean;
-    attemptsShown: number;
-    lastShownAt: number;
-}
 export interface UsageSession {
     sessionStart: number;
     lastActivity: number;
@@ -85,41 +80,7 @@ declare class UsageTracker {
      * Get usage summary for debugging/admin purposes
      */
     getUsageSummary(): Promise<string>;
-    /**
-     * Get onboarding state from config
-     */
-    getOnboardingState(): Promise<OnboardingState>;
-    /**
-     * Save onboarding state to config
-     */
-    saveOnboardingState(state: OnboardingState): Promise<void>;
-    /**
-     * Check if user should see onboarding invitation - SIMPLE VERSION
-     */
-    shouldShowOnboarding(): Promise<boolean>;
-    /**
-     * Get onboarding message for new users - DIRECT 5-OPTION LIST (V2)
-     */
-    getOnboardingMessage(): Promise<{
-        variant: string;
-        message: string;
-    }>;
-    /**
-     * Mark that onboarding message was shown - SIMPLE VERSION
-     */
-    markOnboardingShown(variant: string): Promise<void>;
-    /**
-     * Mark that user used prompts after seeing onboarding invitation - SIMPLE VERSION
-     */
-    markOnboardingPromptsUsed(): Promise<void>;
-    /**
-     * Mark that user has used a specific prompt (for analytics)
-     */
     markPromptUsed(promptId: string, category: string): Promise<void>;
-    /**
-     * Reset onboarding state for testing purposes - SIMPLE VERSION
-     */
-    resetOnboardingState(): Promise<void>;
 }
 export declare const usageTracker: UsageTracker;
 export {};

@@ -1,5 +1,10 @@
+import type { TransportParams } from '@desktop-commander/telemetry-contract/transport';
 export declare function runInUiOriginCallContext<T>(fn: () => T): T;
 export declare function isInsideUiOriginCall(): boolean;
+/** Runs a tool call with its own set of known paths. */
+export declare function runWithToolCallPaths<T>(fn: () => T): T;
+/** Adds paths (strings, or arrays of them) to the current tool call's known paths. */
+export declare function addToolCallPaths(...paths: unknown[]): void;
 /**
  * Hard kill-switch for telemetry via environment variable.
  *
@@ -13,7 +18,7 @@ export declare function isTelemetryDisabledByEnv(): boolean;
  * @param error Error object or string to sanitize
  * @returns An object with sanitized message and optional error code
  */
-export declare function sanitizeError(error: any): {
+export declare function sanitizeError(error: any, knownPaths?: readonly string[]): {
     message: string;
     code?: string;
 };
@@ -23,7 +28,18 @@ export declare function sanitizeError(error: any): {
  * @param properties Optional event properties
  */
 export declare const captureBase: (captureURL: string, event: string, properties?: any) => Promise<void>;
+/**
+ * Build the standard event properties used by the telemetry proxy.
+ * Extracted from captureBase so both paths get identical data.
+ */
+/** Builds the telemetry payload properties for an event, with paths and errors sanitized. */
+export declare const buildEventProperties: (properties?: any) => Promise<any>;
 export declare const capture: (event: string, properties?: any) => Promise<void>;
+/**
+ * Send only contract-validated transport fields through the existing proxy sender,
+ * redacted like every other event (known paths, path properties, error text).
+ */
+export declare const captureTransport: (event: string, properties: TransportParams) => Promise<void>;
 export declare const capture_call_tool: (event: string, properties?: any) => Promise<void>;
 export declare const capture_ui_event: (event: string, properties?: any) => Promise<void>;
 /**

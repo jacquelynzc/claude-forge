@@ -12,7 +12,7 @@ export interface AuthSession {
 }
 /**
  * The device registered, but its realtime channel is not usable — the join
- * failed, or presence was never acknowledged. Distinct from every other
+ * failed, or the device row could not be marked ready. Distinct from every other
  * registration failure on purpose: this one the socket watchdog can repair, so
  * the caller keeps the process alive, while a failed lookup or a missing row
  * happens before the recreation parameters are stored and nothing can repair it.
@@ -27,18 +27,22 @@ interface DeviceData {
     status: string;
     last_seen: string;
 }
-/** Jittered version of realtime-js's default 1s/2s/5s/10s stepped backoff. */
+export declare const HEARTBEAT_INTERVAL_MS: number;
+/** Exponential-ish SDK backoff. Attempts 1-4 preserve short recovery latency. */
 export declare function realtimeReconnectDelayMs(tries: number, random?: () => number): number;
-/** Preserve Presence's existing 500ms-per-attempt retry shape, but desynchronize it. */
-export declare function presenceRetryDelayMs(failedAttempt: number, random?: () => number): number;
+/** Watchdog must not defeat the SDK's slower persistent-failure backoff. */
+export declare function watchdogRecreateDelayMs(tries: number, random?: () => number): number;
+/**
+ * Wait before the next track() after failed ones, across SDK rejoins and
+ * recreates. Never shorter than the step; up to 50% extra spreads the fleet.
+ */
+export declare function presenceRecoveryDelayMs(failures: number, random?: () => number): number;
 export declare function observeServerDate(dateHeader: string | null): void;
 export declare class RemoteChannel {
     private client;
     private channel;
     private heartbeatInterval;
     private connectionCheckInterval;
-    /** Device the heartbeat timer maintains; null = stopped, so re-arm is inert. */
-    private heartbeatDeviceId;
     private statusWriteChain;
     /**
      * Answers whether the local execution child is alive. Default yes, so a
@@ -60,16 +64,27 @@ export declare class RemoteChannel {
     private deviceName;
     private onToolCall;
     private authListenerRegistered;
-    /** False when presence publishing failed on an otherwise healthy channel;
-     * the health check retries, since SUBSCRIBED won't fire again. */
+    /** The current join's status write landed: dispatchable. Gates the
+     * heartbeat, so only that write first marks the row online. */
+    private channelReady;
+    /** Readiness write in flight. Cleared on every join, so each join writes its own. */
+    private readinessInFlight;
+    private consecutiveReadinessFailures;
+    private nextReadinessAttemptAt;
+    /** Presence published on the current join. Dashboard only; never gates dispatch. */
     private presenceTracked;
-    /** Last capability value written (null = never), to avoid redundant writes. */
-    private transportCapableWritten;
-    /** Monotonic start of a Presence-only degradation while broadcast remains joined. */
-    private presenceFailureStartedAt;
     /** Re-entrancy guard: on a wedged socket each track() buffers for the full
      * 10s push timeout, so 10s health ticks would stack pushes. */
     private isTrackingPresence;
+    private consecutiveUnreadyJoins;
+    private consecutivePresenceFailures;
+    private nextPresenceAttemptAt;
+    /** performance.now() of the latest SUBSCRIBED; null while not joined. */
+    private joinedAt;
+    /** SDK channel and socket timers share reconnectAfterMs. The persistent
+     * unready-join budget prevents a series of partial successes restarting at 1s. */
+    private reconnectDelayMs;
+    private readonly realtimeHealth;
     private lastDeviceStatus;
     private lastChannelState;
     private reconnectAttempt;
@@ -117,6 +132,14 @@ export declare class RemoteChannel {
         };
         error: any;
     }>;
+    /**
+     * The session's current access token, for the realtime socket and the
+     * device's own requests. getSession() may refresh on-demand when the token
+     * reads expired — that check is clock-skew-safe now (see clockAwareFetch
+     * above). Without a session it falls back to the last token known, and
+     * without that it is null, never the anon key.
+     */
+    getAccessToken(): Promise<string | null>;
     findDevice(deviceId: string): Promise<{
         id: any;
         device_name: any;
@@ -131,23 +154,29 @@ export declare class RemoteChannel {
     }>;
     registerDevice(capabilities: any, currentDeviceId: string | undefined, deviceName: string, onToolCall: (payload: any) => void): Promise<void>;
     /**
-     * Publish presence, retrying a non-'ok' result — track() resolves with a
-     * status rather than rejecting, and absent presence reads as offline on the
-     * dashboard. `presenceTracked` lets the health check retry later.
+     * Mark this join dispatchable by writing `status`. The write has to land —
+     * Supabase reports a refused write in the result rather than by throwing.
+     * The health check retries on its own cooldown.
      */
-    private trackPresenceWithRetry;
-    private trackPresenceInner;
+    private markChannelReady;
+    private markChannelReadyInner;
     /**
-     * The complete `capabilities` JSONB value. One place only: every write
-     * replaces the whole column, so a second literal would silently drop keys.
+     * Publish presence for the dashboard. Best effort: one track() per call,
+     * no effect on readiness, and a growing cooldown after each failure — a
+     * track() timeout on the server can end the whole channel, and every
+     * rejoin would otherwise publish again.
+     */
+    private trackPresence;
+    /** Presence is withheld by its cooldown right now. Monotonic, so a Date.now
+     * skew correction cannot shorten or extend it. */
+    private presenceInCooldown;
+    /**
+     * The complete `capabilities` JSONB value. The write replaces the whole
+     * column, so a key left out here is dropped from the row.
      */
     private capabilitiesPayload;
-    /**
-     * Advertise (or withdraw) the broadcast capability. Only true while genuinely
-     * reachable that way — the server fails dispatch fast without it and picks
-     * the offline-sweep tier from it, so every change must re-arm the heartbeat.
-     */
-    private setTransportCapable;
+    /** Aborts one write to this device's row after DEVICE_ROW_WRITE_TIMEOUT_MS (a method, so tests can shorten it). */
+    private deviceRowWriteSignal;
     /** Create and subscribe the private channel (initial join and recreation). */
     private createChannel;
     /**
@@ -200,18 +229,20 @@ export declare class RemoteChannel {
      * Claim a call. True only when THIS update flipped the row pending ->
      * executing, which is what makes dual delivery safe across processes.
      * .eq('status','pending') makes it conditional; .select('id') makes the
-     * result observable. On a transient DB error it returns true (execute
-     * anyway), matching prior behaviour — so device.ts's in-memory guard is what
+     * result observable. Expiry is checked using Postgres time, not the
+     * device clock. On a transient DB error it returns true (execute anyway),
+     * matching prior behaviour — so device.ts's in-memory guard is what
      * actually guarantees exactly-once within a process.
      */
     markCallExecuting(callId: string): Promise<boolean>;
     updateCallResult(callId: string, status: string, result?: any, errorMessage?: string | null): Promise<void>;
     /**
      * Reachable means all of it is true at once: the private channel is
-     * joined, this device has published its presence, and the local executor
-     * answers. The server needs the first two before it will dispatch, and a
-     * healthy channel on a device whose executor is dead is the false-online
-     * state issue #4 was opened for. Gates the heartbeat and `status`.
+     * joined, the join's status write landed, and the local executor answers.
+     * The server needs the first two before it will dispatch, and a healthy
+     * channel on a device whose executor is dead is the false-online state
+     * issue #4 was opened for. Presence is not part of it. Gates the heartbeat
+     * and `status`.
      */
     private isReachable;
     /**
@@ -227,28 +258,20 @@ export declare class RemoteChannel {
     /** Resolves with whether the row actually took the write. */
     syncReachabilityStatus(): Promise<boolean>;
     /**
-     * Serialize the channel-callback status writes. They fire from un-awaited
-     * callbacks, and inside recreateChannel() a teardown's 'offline' and the
-     * fresh join's 'online' land ~100-300ms apart — unordered, 'offline' can win
-     * and leave a healthy device undispatchable until the next heartbeat.
+     * Serialize the status writes, the heartbeat's included. They fire from
+     * un-awaited callbacks, and inside recreateChannel() a teardown's 'offline'
+     * and the fresh join's 'online' land ~100-300ms apart — unordered, 'offline'
+     * can win and leave a healthy device undispatchable until the next heartbeat.
      *
-     * Not the single writer: updateHeartbeat, registerDevice and setOffline's
-     * subprocess write status directly, so this is not total ordering.
+     * Not the single writer: registerDevice and setOffline's subprocess write
+     * status directly, so this is not total ordering.
      */
     private queueStatusWrite;
-    /**
-     * Heartbeat cadence for the tier this device is CURRENTLY in. Follows the
-     * capability flag (what the server actually tiers its sweep on), not the
-     * build — see LEGACY_HEARTBEAT_INTERVAL.
-     */
-    private heartbeatIntervalMs;
-    updateHeartbeat(deviceId: string): Promise<void>;
+    updateHeartbeat(): Promise<void>;
     startHeartbeat(deviceId: string): void;
     private refreshTokenNow;
     private startTokenRefresh;
     private stopTokenRefresh;
-    /** Arm (or re-arm) the last_seen timer at the current tier's cadence. */
-    private scheduleHeartbeat;
     stopHeartbeat(): void;
     /** @returns whether the row actually took the write. */
     setOnlineStatus(deviceId: string, status: 'online' | 'offline'): Promise<boolean>;

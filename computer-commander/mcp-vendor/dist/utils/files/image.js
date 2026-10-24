@@ -3,14 +3,24 @@
  * Handles reading image files and converting to base64
  */
 import fs from "fs/promises";
+const SVG_MIME_TYPE = 'image/svg+xml';
+/**
+ * Whether content of this MIME type is answered as an image: every image type
+ * but SVG, which is text (XML), read and written as text. Only the file preview
+ * widget draws an SVG as an image (svgAsImage). Files and URLs both decide here.
+ */
+export function isImageAnswer(mimeType, svgAsImage = false) {
+    const type = mimeType.toLowerCase().split(';')[0].trim();
+    return type.startsWith('image/') && (svgAsImage || type !== SVG_MIME_TYPE);
+}
 /**
  * Image file handler implementation
- * Supports: PNG, JPEG, GIF, WebP, BMP, SVG
+ * Supports: PNG, JPEG, GIF, WebP, BMP; an SVG only for the file preview widget
+ * (isImageAnswer), everyone else reads and writes it as text.
  */
 export class ImageFileHandler {
-    canHandle(path) {
-        const lowerPath = path.toLowerCase();
-        return ImageFileHandler.IMAGE_EXTENSIONS.some(ext => lowerPath.endsWith(ext));
+    canHandle(path, options) {
+        return isImageAnswer(this.getMimeType(path), options?.svgAsImage);
     }
     async read(path, options) {
         // Images are always read in full, ignoring offset and length
@@ -25,7 +35,11 @@ export class ImageFileHandler {
             }
         };
     }
-    async write(path, content) {
+    async write(path, content, mode) {
+        // An image can't take text at its end: writing the content would replace the file
+        if (mode === 'append') {
+            throw new Error('Image append not supported.');
+        }
         // If content is base64 string, convert to buffer
         if (typeof content === 'string') {
             const buffer = Buffer.from(content, 'base64');
@@ -64,9 +78,6 @@ export class ImageFileHandler {
         return 'application/octet-stream'; // Fallback
     }
 }
-ImageFileHandler.IMAGE_EXTENSIONS = [
-    '.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.svg'
-];
 ImageFileHandler.IMAGE_MIME_TYPES = {
     '.png': 'image/png',
     '.jpg': 'image/jpeg',

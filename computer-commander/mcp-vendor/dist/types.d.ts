@@ -16,7 +16,7 @@ export interface TerminalSession {
     process: ChildProcess;
     outputLines: string[];
     lastReadIndex: number;
-    isBlocked: boolean;
+    lastReadOpenLine: string;
     startTime: Date;
     bufferedChars: number;
     evictedLines: number;

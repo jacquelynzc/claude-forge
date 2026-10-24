@@ -5,7 +5,12 @@ class CommandManager {
     getBaseCommand(command) {
         return command.split(' ')[0].toLowerCase().trim();
     }
-    extractCommands(commandString) {
+    /**
+     * The command name of each command in a command line (chained, piped, in $(), ...).
+     * asTyped: each first word as typed instead of its base name, for telemetry,
+     * which then replaces a path whole (a base name alone can't be told from one).
+     */
+    extractCommands(commandString, asTyped = false) {
         try {
             // Trim any leading/trailing whitespace
             commandString = commandString.trim();
@@ -59,7 +64,7 @@ class CommandManager {
                     }
                     if (j <= commandString.length && openParens === 0) {
                         const subContent = commandString.substring(i + 2, j - 1);
-                        const subCommands = this.extractCommands(subContent);
+                        const subCommands = this.extractCommands(subContent, asTyped);
                         commands.push(...subCommands);
                         i = j - 1;
                         if (!inQuote) {
@@ -80,7 +85,7 @@ class CommandManager {
                     }
                     if (j < commandString.length) {
                         const subContent = commandString.substring(i + 1, j);
-                        const subCommands = this.extractCommands(subContent);
+                        const subCommands = this.extractCommands(subContent, asTyped);
                         commands.push(...subCommands);
                         i = j;
                         if (!inQuote) {
@@ -113,7 +118,7 @@ class CommandManager {
                     if (j <= commandString.length && openParens === 0) {
                         const subshellContent = commandString.substring(i + 1, j - 1);
                         // Recursively extract commands from the subshell
-                        const subCommands = this.extractCommands(subshellContent);
+                        const subCommands = this.extractCommands(subshellContent, asTyped);
                         commands.push(...subCommands);
                         // Move position past the subshell
                         i = j - 1;
@@ -126,7 +131,7 @@ class CommandManager {
                     if (commandString.startsWith(separator, i)) {
                         // We found a separator - extract the command before it
                         if (currentCmd.trim()) {
-                            const baseCommand = this.extractBaseCommand(currentCmd.trim());
+                            const baseCommand = this.extractBaseCommand(currentCmd.trim(), asTyped);
                             if (baseCommand)
                                 commands.push(baseCommand);
                         }
@@ -143,7 +148,7 @@ class CommandManager {
             }
             // Don't forget to add the last command
             if (currentCmd.trim()) {
-                const baseCommand = this.extractBaseCommand(currentCmd.trim());
+                const baseCommand = this.extractBaseCommand(currentCmd.trim(), asTyped);
                 if (baseCommand)
                     commands.push(baseCommand);
             }
@@ -155,12 +160,12 @@ class CommandManager {
             capture('server_request_error', {
                 error: 'Error extracting commands'
             });
-            const baseCmd = this.extractBaseCommand(commandString);
+            const baseCmd = this.extractBaseCommand(commandString, asTyped);
             return baseCmd ? [baseCmd] : [];
         }
     }
-    // This extracts the actual command name from a command string
-    extractBaseCommand(commandStr) {
+    // This extracts the actual command name from a command string (asTyped: see extractCommands)
+    extractBaseCommand(commandStr, asTyped = false) {
         try {
             // Remove environment variables (patterns like KEY=value)
             const withoutEnvVars = commandStr.replace(/\w+=\S+\s*/g, '').trim();
@@ -193,12 +198,12 @@ class CommandManager {
                 const inner = firstToken.slice(2, -1).trim();
                 if (inner) {
                     const innerTokens = inner.split(/\s+/);
-                    return path.basename(innerTokens[0]).toLowerCase();
+                    return (asTyped ? innerTokens[0] : path.basename(innerTokens[0])).toLowerCase();
                 }
                 return null;
             }
             // strip path prefix so /usr/bin/sudo gets caught as "sudo"
-            const baseName = path.basename(firstToken);
+            const baseName = asTyped ? firstToken : path.basename(firstToken);
             return baseName.toLowerCase();
         }
         catch (error) {

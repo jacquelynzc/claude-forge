@@ -3,6 +3,7 @@ export interface DockerMount {
     containerPath: string;
     type: 'bind' | 'volume';
     readOnly: boolean;
+    verifiedMount: boolean;
     description: string;
 }
 export interface ContainerInfo {

@@ -1,3 +1,4 @@
+import { LazyPackage } from '../../utils/lazy-package.js';
 export interface ImageInfo {
     /** Object ID within PDF */
     objId: number;
@@ -24,6 +25,7 @@ export interface ImageCompressionOptions {
     /** Maximum dimension to resize to (maintains aspect ratio) */
     maxDimension?: number;
 }
+export declare const unpdfPackage: LazyPackage<Promise<typeof import("unpdf")>>;
 /**
  * Optimized image extraction from PDF using unpdf's built-in extractImages method
  * @param pdfBuffer PDF file as Uint8Array

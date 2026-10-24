@@ -4,7 +4,7 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { CONFIG_EDITOR_RESOURCE_URI, FILE_PREVIEW_RESOURCE_URI } from './contracts.js';
+import { buildUiContentSecurityPolicy, CONFIG_EDITOR_RESOURCE_URI, FILE_PREVIEW_RESOURCE_URI, UI_FONT_ORIGINS, UI_RESOURCE_CSP } from './contracts.js';
 const UI_RESOURCE_MIME_TYPE = 'text/html;profile=mcp-app';
 export const FILE_PREVIEW_RESOURCE = {
     uri: FILE_PREVIEW_RESOURCE_URI,
@@ -31,7 +31,9 @@ function replaceOrThrow(source, pattern, replacement, context) {
 function inlineTemplateAssets(templateHtml, css, runtime) {
     const safeCss = css.replace(/<\/style/gi, '<\\/style');
     const safeRuntime = runtime.replace(/<\/script/gi, '<\\/script');
-    const cssInlined = replaceOrThrow(templateHtml, /<link[^>]*href=["']\.\/styles\.css["'][^>]*>/i, `<style>${safeCss}</style>`, 'styles.css link tag');
+    // First in <head>, so it covers everything the page loads, previews included
+    const policyAdded = replaceOrThrow(templateHtml, /<head>/i, `<head><meta http-equiv="Content-Security-Policy" content="${buildUiContentSecurityPolicy(UI_RESOURCE_CSP, UI_FONT_ORIGINS)}">`, '<head> tag');
+    const cssInlined = replaceOrThrow(policyAdded, /<link[^>]*href=["']\.\/styles\.css["'][^>]*>/i, `<style>${safeCss}</style>`, 'styles.css link tag');
     const runtimeInlined = replaceOrThrow(cssInlined, /<script[^>]*src=["']\.\/[^"']+["'][^>]*>\s*<\/script>/i, `<script>${safeRuntime}</script>`, 'runtime script tag');
     if (/href=["']\.\/styles\.css["']/i.test(runtimeInlined) ||
         /<script[^>]*src=["']\.\/[^"']+["']/i.test(runtimeInlined)) {
@@ -53,14 +55,19 @@ export async function getFilePreviewResourceText() {
 export async function getConfigEditorResourceText() {
     return readInlinedResourceHtml(DIST_CONFIG_EDITOR_DIR, 'config-editor-runtime.js');
 }
+function getUiResourceMeta() {
+    return { ui: { csp: UI_RESOURCE_CSP } };
+}
 const READABLE_UI_RESOURCES = {
     [FILE_PREVIEW_RESOURCE_URI]: {
         mimeType: FILE_PREVIEW_RESOURCE.mimeType,
-        getText: getFilePreviewResourceText
+        getText: getFilePreviewResourceText,
+        getMeta: getUiResourceMeta
     },
     [CONFIG_EDITOR_RESOURCE_URI]: {
         mimeType: CONFIG_EDITOR_RESOURCE.mimeType,
-        getText: getConfigEditorResourceText
+        getText: getConfigEditorResourceText,
+        getMeta: getUiResourceMeta
     }
 };
 export function listUiResources() {

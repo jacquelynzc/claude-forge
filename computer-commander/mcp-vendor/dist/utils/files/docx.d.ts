@@ -15,7 +15,10 @@
  *
  * Round-trip: DOCX → unzip → pretty-print → [outline or raw] → edit → compact → repack
  */
+import type PizZip from 'pizzip';
+import { LazyPackage } from '../lazy-package.js';
 import { FileHandler, FileResult, FileInfo, ReadOptions, EditResult } from './base.js';
+export declare const pizzipPackage: LazyPackage<typeof PizZip>;
 export declare class DocxFileHandler implements FileHandler {
     private readonly extensions;
     canHandle(path: string): boolean;
