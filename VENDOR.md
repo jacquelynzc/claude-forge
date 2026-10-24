@@ -10,7 +10,7 @@ rather than re-cloned, so the bytes here are the bytes that were in use.
 | caveman | https://github.com/JuliusBrussee/caveman | commit 0d95a81d35a9 | ~/.claude/plugins/cache/caveman/caveman/0d95a81d35a9/ |
 | superpowers | https://github.com/obra/superpowers.git | 6.1.1 | ~/.claude/plugins/cache/superpowers-dev/superpowers/6.1.1/ |
 | humanizer | https://github.com/blader/humanizer.git | 2.8.2 | ~/.claude/plugins/cache/humanizer/humanizer/2.8.2/ |
-| computer-commander | https://github.com/wonderwhy-er/DesktopCommanderMCP.git | v0.2.52 (tag) | re-cloned from upstream 2026-09-22, updated to v0.2.52 on 2026-10-05 |
+| computer-commander | https://github.com/wonderwhy-er/DesktopCommanderMCP.git | v0.3.1 (tag) | re-cloned from upstream 2026-09-22, updated to v0.2.52 on 2026-10-05, to v0.3.1 on 2026-10-24 |
 | memory (remember) | https://github.com/Digital-Process-Tools/claude-remember.git | v0.43.1 (tag) | re-cloned from upstream 2026-10-15 |
 | common-ground | https://github.com/Jeffallan/claude-skills (inspiration only) | 1.0.0 | original adaptation, added 2026-09-27 |
 
@@ -83,6 +83,8 @@ source rather than by config flag:
 | `captureBase()` | same, secondary path | returns immediately |
 | `isTelemetryDisabledByEnv()` | reads an env var | always true |
 | `FeatureFlags.fetchFlags()` | pulls desktopcommander.app/flags/v2/production.json on every start | returns immediately; cached/default flags only |
+| `captureTransport()` (v0.3.0+) | remote-transport events, bypasses `capture()` | returns immediately |
+| `sendToTelemetryProxy()` / `postTelemetryPayload()` (v0.3.0+) | the shared send path and its only `https.request` | return immediately; blocks every sender, current or future, that uses the proxy transport |
 
 The feature-flag fetch mattered as much as the telemetry: it let upstream
 change this server's behaviour (A/B experiments, onboarding injection, UI
@@ -377,6 +379,66 @@ Also changed this day, outside the repo: `allowedDirectories` in
 `~/.claude-server-commander/config.json` dropped `/Users/rude/Downloads`, now
 `["/Users/rude/sandbox", "/Users/rude/dev"]`. Downloads is where untrusted
 files land; it does not need to be reachable by the agent.
+
+### Updated to v0.3.1, 1.7.0
+
+Updated 2026-10-24 with `scripts/update-computer-commander.sh v0.3.1 --apply`
+(commit 5f3db170). Plugin 1.6.2 to 1.7.0, marketplace 1.13.0 to 1.14.0.
+
+All three v0.2.52 patches failed against v0.3.0 and were re-derived by hand;
+the same four apply clean to v0.3.1.
+
+The finding that mattered: v0.3.0 added `captureTransport()` in
+`src/utils/capture.ts`, used by the new `src/remote-device/transport-telemetry.ts`.
+It calls `sendToTelemetryProxy()` directly and never goes through `capture()`.
+The old patch, re-applied mechanically to `capture`, `captureBase` and
+`isTelemetryDisabledByEnv`, would have built clean and left it sending. Also,
+`captureBase()` is now dead code upstream, so guarding it alone covers nothing.
+0001 now guards the transport (`sendToTelemetryProxy`, `postTelemetryPayload`)
+as well as every entry point, so a future sender on the same transport is
+covered without a patch change.
+
+Patches, new steady state **4**:
+
+- `0001` telemetry and remote flags, re-derived as above.
+- `0002` server identity, unchanged in intent.
+- `0003` install-time senders, re-derived. Upstream still ships
+  `track-installation.js`, `setup-claude-server.js`, `uninstall-claude-server.js`,
+  the `postinstall` hook and the `shx cp` into `dist/`.
+- `0004` new. `remote --report` uploads a diagnostics zip by default to a URL
+  the server names in `/api/mcp-info`. `uploadReport()` now throws; the zip is
+  still saved locally and the CLI says to attach it by hand.
+
+Reviewed and left alone:
+
+- `src/remote-device/rollouts.ts` (v0.3.1): server-controlled feature rollouts,
+  polled every 30 minutes and pushed through call rows. Same class as
+  `fetchFlags`, but remote-device only. Not patched because remote-device mode
+  is not in use here: no `~/.desktop-commander-device/` exists. Patch it before
+  pairing a device.
+- `UI_FONT_ORIGINS = ['https://assets.claude.ai']` (v0.3.1): CSP allowance for
+  fonts in the file-preview UI. Not a request from the server.
+- New root `test-listener-bug.js`: a local test, not copied into `dist/`.
+- New dependency `@desktop-commander/telemetry-contract` resolves to
+  `file:vendor/telemetry-contract` in the upstream tree; no network calls.
+- Remote-device Supabase and `/api/mcp-info` calls: dormant, as before.
+
+Updater fix: `assert_dist_complete` required `dist/setup-claude-server.js` and
+`dist/uninstall-claude-server.js`, which 0003 removes, so `--apply` would have
+exited partway after replacing the tree. Both dropped from the list.
+
+Verified: `__forkDisabled` 7x in `dist/utils/capture.js`, 2x in
+`dist/utils/feature-flags.js`, 2x in `dist/remote-device/diagnostics/upload.js`.
+Telemetry hosts appear only in `dist/utils/capture.js`. No installer files in
+`dist/`, no `postinstall`. `initialize` + `tools/list` returns
+`computer-commander 0.3.1` with 25 tools.
+
+The force-add was missed again. 5f3db170 used `git add .`, which picked up
+changes to already-tracked `dist`/`node_modules` files but not the 34 new
+`dist` files or 1980 new `node_modules` files, so the pushed 1.7.0 imported
+modules that were not in git. Fixed in the follow-up commit with
+`git add -f`. The same commit fixes a raw newline inside the `description`
+string in `plugin.json` that made it invalid JSON.
 
 ## common-ground
 
