@@ -29,7 +29,7 @@ and this table is updated to record the new fork point.
 
 Imported 2026-11-01 from upstream at the commits the installed plugins were
 running (verified byte-identical against the plugin cache and the Cowork copy).
-The only change is the plugin `name` in `.claude-plugin/plugin.json`
+The only changes are removing upstream's nested `.claude-plugin/marketplace.json` (Cowork listed it as a duplicate plugin) and the plugin `name` in `.claude-plugin/plugin.json`
 (`unity` -> `unity-dev`, `game-trend-skills` -> `game-trends`) so both install
 next to the upstream plugins. Skill names are unchanged, so the skills'
 cross-references still resolve.
