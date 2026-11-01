@@ -1,8 +1,8 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "claude-forge",
-  "version": "1.14.0",
-  "description": "Local-only forks of ui-craft, caveman, superpowers, humanizer, computer-commander, and remember (as memory), plus common-ground",
+  "version": "1.15.0",
+  "description": "Local-only forks of ui-craft, caveman, superpowers, humanizer, computer-commander, and remember (as memory), unity (as unity-dev) and game-trend-skills (as game-trends), plus common-ground",
   "owner": {
     "name": "rude"
   },
@@ -41,6 +41,16 @@
       "name": "memory",
       "source": "./memory",
       "description": "Continuous memory for Claude Code: tiered daily logs and session handoffs. Fork of claude-remember 0.43.1, renamed to memory so it can be installed next to the official remember plugin."
+    },
+    {
+      "name": "unity-dev",
+      "source": "./unity-dev",
+      "description": "Unity Technologies agent skills (UI Toolkit, uGUI, 2D, tilemaps, URP, IAP, multiplayer, localization). Fork of unity-agent-plugin 0.1.8-beta, renamed so it installs next to the official unity plugin. Unity Companion License."
+    },
+    {
+      "name": "game-trends",
+      "source": "./game-trends",
+      "description": "Mobile game trend scans, idea brainstorming and scoring, KPI tracking, agent build briefs, zero-budget launch plans. Fork of malicaki/game-trend-skills 0.1.0, renamed to game-trends."
     }
   ]
 }

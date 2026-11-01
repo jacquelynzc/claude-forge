@@ -12,6 +12,8 @@ rather than re-cloned, so the bytes here are the bytes that were in use.
 | humanizer | https://github.com/blader/humanizer.git | 2.8.2 | ~/.claude/plugins/cache/humanizer/humanizer/2.8.2/ |
 | computer-commander | https://github.com/wonderwhy-er/DesktopCommanderMCP.git | v0.3.1 (tag) | re-cloned from upstream 2026-09-22, updated to v0.2.52 on 2026-10-05, to v0.3.1 on 2026-10-24 |
 | memory (remember) | https://github.com/Digital-Process-Tools/claude-remember.git | v0.43.1 (tag) | re-cloned from upstream 2026-10-15 |
+| unity-dev (unity) | https://github.com/Unity-Technologies/unity-agent-plugin | 0.1.8-beta, commit 759ad5fe88dd | re-cloned from upstream 2026-11-01 |
+| game-trends (game-trend-skills) | https://github.com/malicaki/game-trend-skills | 0.1.0, commit b073dc7bae3c | re-cloned from upstream 2026-11-01 |
 | common-ground | https://github.com/Jeffallan/claude-skills (inspiration only) | 1.0.0 | original adaptation, added 2026-09-27 |
 
 humanizer was verified byte-for-byte against
@@ -22,6 +24,30 @@ Runtime artifacts (`.in_use/`, `.git/`) were excluded from the copy.
 To review upstream changes, run scripts/check-upstream.sh. Nothing is pulled
 automatically; applying an upstream change is a manual edit plus a commit,
 and this table is updated to record the new fork point.
+
+## unity-dev and game-trends
+
+Imported 2026-11-01 from upstream at the commits the installed plugins were
+running (verified byte-identical against the plugin cache and the Cowork copy).
+The only change is the plugin `name` in `.claude-plugin/plugin.json`
+(`unity` -> `unity-dev`, `game-trend-skills` -> `game-trends`) so both install
+next to the upstream plugins. Skill names are unchanged, so the skills'
+cross-references still resolve.
+
+Unlike the other forks, these are kept current automatically:
+
+- `scripts/game-plugins.lock` pins each upstream commit.
+- `scripts/update-game-plugins.sh` reports drift; `--apply` replaces the tree
+  with upstream HEAD, re-applies the rename, then replays
+  `<plugin>/patches/*.patch` in order. A patch that no longer applies fails
+  the run. Put any local fix there, never as a bare edit, or the next sync
+  erases it.
+- `.github/workflows/sync-game-plugins.yml` runs `--apply` every Monday and
+  opens a PR. Merge after review.
+
+unity-dev is under the Unity Companion License, which covers use and
+redistribution only with Unity-dependent projects. `LICENSE.md` is kept as
+shipped. game-trends is MIT.
 
 ## ui-craft MCP server
 

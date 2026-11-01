@@ -1,0 +1,23 @@
+{
+  "name": "game-trend-skills",
+  "displayName": "Game Trend Skills",
+  "description": "Live mobile game trend scans, idea brainstorming and evaluation, KPI tracking, agent build briefs and zero-budget launch plans for solo game devs.",
+  "version": "0.1.0",
+  "author": {
+    "name": "malicaki",
+    "url": "https://github.com/malicaki"
+  },
+  "homepage": "https://github.com/malicaki/game-trend-skills",
+  "repository": "https://github.com/malicaki/game-trend-skills",
+  "license": "MIT",
+  "keywords": [
+    "mobile-games",
+    "hypercasual",
+    "hybrid-casual",
+    "game-design",
+    "market-research",
+    "monetization",
+    "skills"
+  ],
+  "skills": "./skills/"
+}
