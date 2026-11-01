@@ -38,3 +38,7 @@ echo "Review each diff before applying anything. Update VENDOR.md when you do."
 echo
 echo "=== computer-commander ==="
 echo "  use scripts/update-computer-commander.sh (report-only by default)"
+
+echo
+echo "=== unity-dev, game-trends ==="
+echo "  use scripts/update-game-plugins.sh (report-only by default; weekly PR via GitHub Actions)"

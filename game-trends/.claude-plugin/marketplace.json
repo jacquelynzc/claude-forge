@@ -1,0 +1,20 @@
+{
+  "name": "game-trend-skills",
+  "description": "Marketplace for the Game Trend Skills plugin",
+  "owner": {
+    "name": "malicaki",
+    "url": "https://github.com/malicaki"
+  },
+  "plugins": [
+    {
+      "name": "game-trend-skills",
+      "description": "Live mobile game trend scans, idea brainstorming and evaluation, KPI tracking, agent build briefs and zero-budget launch plans for solo game devs.",
+      "version": "0.1.0",
+      "source": "./",
+      "author": {
+        "name": "malicaki",
+        "url": "https://github.com/malicaki"
+      }
+    }
+  ]
+}

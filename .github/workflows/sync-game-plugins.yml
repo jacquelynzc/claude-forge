@@ -1,0 +1,40 @@
+name: Sync game-dev plugins
+
+# Weekly: pull upstream unity-agent-plugin and game-trend-skills into
+# unity-dev/ and game-trends/, re-apply the rename and local patches, and open
+# a PR. Nothing lands on main without review.
+on:
+  schedule:
+    - cron: "0 14 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Sync upstream
+        run: scripts/update-game-plugins.sh --apply | tee sync.log
+      - name: Open PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git diff --quiet && git diff --cached --quiet && { echo "no upstream changes"; exit 0; }
+          branch="chore/sync-game-plugins-$(date +%Y%m%d)"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$branch"
+          git add -A unity-dev game-trends scripts/game-plugins.lock
+          git commit -m "chore(game-plugins): sync upstream"
+          git push -f origin "$branch"
+          gh pr create --base main --head "$branch" \
+            --title "chore(game-plugins): sync upstream" \
+            --body "$(printf 'Automated upstream sync. Review the diff before merging, then update VENDOR.md.\n\n```\n%s\n```' "$(cat sync.log)")" \
+            || echo "PR already open for $branch"

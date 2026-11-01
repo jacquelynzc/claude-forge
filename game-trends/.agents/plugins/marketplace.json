@@ -1,0 +1,21 @@
+{
+  "name": "game-trend-skills",
+  "interface": {
+    "displayName": "Game Trend Skills"
+  },
+  "plugins": [
+    {
+      "name": "game-trend-skills",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/malicaki/game-trend-skills.git",
+        "ref": "master"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}
