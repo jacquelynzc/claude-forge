@@ -30,6 +30,10 @@ CHANGED=0
 # plugin without colliding. Skill names stay upstream's so cross-references hold.
 rename_plugin() {
   local dir="$1" name="$2" f
+  # Upstream ships its own marketplace.json pointing at "./". Cowork reads
+  # nested marketplaces too, so leaving it lists the plugin a second time
+  # under its upstream name and disables one copy.
+  rm -f "$dir/.claude-plugin/marketplace.json"
   for f in "$dir"/.claude-plugin/plugin.json; do
     node -e '
       const fs = require("fs"); const [f, name] = process.argv.slice(1);
