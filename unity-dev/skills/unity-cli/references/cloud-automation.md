@@ -14,6 +14,9 @@ and to start, follow, and act on builds and jobs.
 - Read version history and job statistics
 - Filter and sort build targets
 - Request additional pages
+- Set up a build target
+- Create an app
+- Add a version to an app
 - Read results
 - Handle failures
 
@@ -31,16 +34,29 @@ and to start, follow, and act on builds and jobs.
 | An app's or pipeline's version history | `unity pipeline automation apps versions` / `pipelines versions` |
 | How many jobs are running or queued | `unity pipeline automation jobs stats` |
 | A build's steps, failures, artifacts, or log | `unity pipeline cloud-build builds steps` / `failures` / `artifacts` / `log` |
+| How long each phase of a build took (staging only) | `unity pipeline cloud-build builds timeline` |
 | One artifact file on disk | `unity pipeline cloud-build builds download` |
 | Start a build, wait for it, or cancel builds | `unity pipeline cloud-build builds start` / `cancel` |
 | Run a pipeline, or follow a job to its end | `unity pipeline automation pipelines trigger` / `jobs watch` |
 | A job's logs, or one step's as it runs | `unity pipeline automation jobs logs` |
 | Stop a job, or answer a step that's waiting | `unity pipeline automation jobs terminate` / `resume` / `approve` / `reject` |
+| Create or change a build target | `unity pipeline cloud-build targets create` / `update` |
+| Create a Pipeline Automation app | `unity pipeline automation apps create` |
+| Add a version to an app | `unity pipeline automation apps versions create` |
+| What changed in a target's configuration, and who changed it | `unity pipeline cloud-build targets auditlog` |
+| Connect the project to a repository, or list its connections | `unity pipeline cloud-build connections` / `connections create` |
+| Check that Build Automation can reach a repository | `unity pipeline cloud-build scm check-url` |
+| Upload signing credentials | `unity pipeline cloud-build credentials <android\|ios\|osx\|uwp> upload` |
+| Whether the organization has used up its free tier | `unity pipeline cloud-build org free-tier` |
 
 The inventory commands (the first nine rows) are read-only. The rest start,
 cancel, and change remote work: read [Confirm, wait, and
-stop](#confirm-wait-and-stop) before running them for a user. None of them
-change configuration. They don't require a running Editor or
+stop](#confirm-wait-and-stop) before running them for a user. `targets create`
+and `update`, `connections create` and `credentials upload` change the project's
+configuration: read [Set up a build target](#set-up-a-build-target) first.
+`apps create` adds an app to the organization: read [Create an app](#create-an-app)
+first, and [Add a version to an app](#add-a-version-to-an-app) before
+`apps versions create`. They don't require a running Editor or
 the local Pipeline package. Local `unity pipeline install|upgrade|list|list-versions`
 commands manage the Editor package, not cloud resources.
 
@@ -367,6 +383,22 @@ unity pipeline cloud-build builds log "<build-number>" --build-target "<target-i
 file's signed `href` is masked as `***` in machine output and never appears in a
 table; use `builds download` to fetch a file.
 
+`builds timeline` shows how many seconds each phase of a build took. Only
+staging serves it, so pass `--cloudEnvironment staging`; on production it is
+refused before any request with `AUTOMATION_COMMAND_STAGING_ONLY` (exit `2`).
+
+```sh
+unity --cloudEnvironment staging pipeline cloud-build builds timeline "<build-number>" --build-target "<target-id>" --format json
+```
+
+JSON returns the API response under `data`, one key per phase in the order the
+API sends them (`waiting`, `checkout`, `cacheRestore`, `build`, `cacheSave`,
+`upload`). Each phase is an object with `seconds`, and `waiting` also splits its
+time into `queuedSeconds`, `machineStartupSeconds`, `orgConcurrencyLimitSeconds`
+and `targetConcurrencyLimitSeconds`. A phase with no recorded time is `null`. The
+table has one `phase` and `seconds` row per phase, with empty `seconds` for a
+`null` phase.
+
 `builds log` prints the whole log there is now. `--compact` asks for the short
 log. `--follow` keeps reading every 15 seconds and prints only new lines until
 the build finishes. In NDJSON each line is a `{"type":"log","line":<n>,"text":<string>}`
@@ -427,6 +459,160 @@ by its final state. It exits `0` only when every build ends `success`; otherwise
 service answers the same way for a build that had already finished, so the
 result (`data: null`) and the human line say cancellation was requested, not
 that a build was cancelled. It asks first; see below.
+
+## Set up a build target
+
+The order for a project with nothing set up yet:
+
+```sh
+unity vcs setup --vcs uvcs                                  # only when the project has no repository
+unity pipeline cloud-build scm check-url --type git --url "<url>" --user "<user>" --password-from-stdin < pass.txt
+unity pipeline cloud-build connections create --name game --type plastic --url "<org>@cloud" --format json
+unity pipeline cloud-build credentials android upload --label release --keystore release.keystore --alias key0 --keystore-password-from-stdin < store-pass.txt
+unity pipeline cloud-build org free-tier --format json
+unity pipeline cloud-build targets create --name webgl-main --platform webgl --repo "<repo>" --branch main --remote-cache-strategy library --format json
+unity pipeline cloud-build builds start --build-target webgl-main --wait --format ndjson
+```
+
+**Connections.** The project's first connection becomes its default, and
+`targets create` uses the default unless `--connection <id>` names another.
+`--type plastic` (Unity Version Control) takes no secret: the CLI exchanges your
+Unity sign-in for the repository token. A UVCS target also needs `--repo <name>`,
+the repository `vcs setup` created, or the service builds one named `main`. `--type oauth` needs `--git-provider`
+(`github`, `gitlab` or `bitbucket`) and a token. The service checks that it can
+reach the repository before it creates any connection, and refuses one it can't
+(exit `6`, `Repository URL is not reachable`). So `--type git` with an SSH URL
+works only once the organization's SSH key can read the repository; where the
+organization has per-connection keys turned on, `--ssh-key-type` asks for a new
+key, and the response carries its public key. Prefer `oauth` or `plastic` when
+nothing is set up yet. `scm check-url` checks an HTTPS URL with a user and
+password before creating its connection, but the service checks a GitHub HTTPS
+URL over SSH; check an OAuth, SSH or Unity Version Control URL after creating
+its connection, with `--connection <id>`, since those checks use its stored token
+or key. An unreachable URL fails with
+`AUTOMATION_SCM_URL_INACCESSIBLE`, exit `6`, and keeps `isAccessible`,
+`normalizedUrl` and `errorMessages` under `data`.
+
+**Targets.** Each option sets one field, and `targets update` changes only the
+fields given. `--file <path>` reads a whole target as JSON (`-` reads stdin);
+options override its fields. A saved `targets get --format json` result works as
+it is: the CLI reads its `data` and drops the read-only fields, so `get`, edit,
+`create --file` copies a target. The copy has no signing credentials, since
+`get` never shows them: pass `--credential` again. Booleans
+have a `--no-` form. `--scene` repeats, and on `update` replaces the whole list.
+`--editor-version`, `--xcode-version` and `--machine-type` take the values the
+`tooling` lookups list; prefer a machine type with `freeTierEligible: true`, and
+choose a paid one, or `--remote-cache-strategy boostdisk`, only when the user asks.
+Deprecated Unity, Xcode or OS versions come back in `data.notices` (human output
+warns). A setting the service refuses fails with exit `6` and its details.
+
+**Target options.** `targets create` and `targets update` take the same options;
+each sets one field of the target.
+
+| Option | Sets |
+|---|---|
+| `--name`, `--platform`, `--connection` | Name, platform (required on create), source control connection |
+| `--branch`, `--subdirectory`, `--repo` | Branch to build, project folder in the repository, Unity Version Control repository (the service builds `main` without it) |
+| `--editor-version`, `--auto-detect-editor-version` | Editor version, or the one the project uses |
+| `--executable-name`, `--bundle-id`, `--build-profile-path`, `--xcode-version` | Executable, bundle ID, build profile, Xcode version |
+| `--scene` (repeatable), `--pre-export-method`, `--post-export-method` | Scene list in build order, static methods run around the export |
+| `--build-addressables`, `--run-unit-tests`, `--run-edit-mode-tests`, `--run-play-mode-tests` | Addressables content, tests before the build |
+| `--development-build`, `--app-bundle` | Development build, Android App Bundle instead of APK |
+| `--remote-cache-strategy`, `--artifact-compression-level` | Build cache, artifact compression |
+| `--machine-type`, `--builder-os`, `--builder-os-version` | Build machine |
+| `--credential` | Signing credentials |
+| `--auto-build`, `--schedule`, `--schedule-start`, `--schedule-cron`, `--schedule-timezone` | Build on commit, build on a schedule |
+
+Each boolean has a `--no-` form to turn it off on `update`:
+`--no-auto-detect-editor-version`, `--no-build-addressables`, `--no-run-unit-tests`,
+`--no-run-edit-mode-tests`, `--no-run-play-mode-tests`, `--no-development-build`,
+`--no-app-bundle` and `--no-auto-build`.
+
+**Credential options.** Every upload takes `--label`.
+- `credentials android upload`: `--keystore`, `--alias`, `--keystore-password-from-stdin`, `--key-password-from-stdin`.
+- `credentials ios upload`: `--certificate` (.p12), `--provisioning-profile`, `--certificate-password-from-stdin` (optional).
+- `credentials osx upload`: `--certificate`, `--apple-id`, `--apple-id-password-from-stdin`, `--provider-name`, `--entitlements`, `--certificate-password-from-stdin`.
+- `credentials uwp upload`: `--certificate`, `--certificate-password-from-stdin`.
+- `connections create --type oauth` takes its token with `--token-from-stdin`, and `--password-from-stdin` carries a git password.
+
+**Credentials.** Upload once, then pass the returned `credentialid` as
+`--credential`. iOS returns the profile's `bundleId`: compare it with the target's
+`--bundle-id`. Each password comes from its `--…-from-stdin` option or its variable
+(`UNITY_KEYSTORE_PASSWORD`, `UNITY_KEY_PASSWORD`, `UNITY_CERTIFICATE_PASSWORD`,
+`UNITY_APPLE_ID_PASSWORD`, `UNITY_SCM_PASSWORD`, `UNITY_SCM_TOKEN`); never put one in
+an argument. Stdin carries one value, so a second secret, or a `--file -` body,
+takes the variable (`AUTOMATION_STDIN_CONFLICT`, exit `2`, otherwise). Output never
+shows a secret.
+
+**Audit log.** `targets auditlog <target-id>` lists the target's configuration
+changes and its project's, newest first, paged with `--page` and `--limit`. Each
+entry has `updated`, `updatingUserEmail`, `scope` and `lines` of `field`, `from`
+and `to`; the table has one row per changed field. Environment variable changes
+are not recorded, a signing change shows only as `changed`, and secret values
+show as `***`. Compare an entry's `updated` with a build's `created` to see which
+setting changed between a passing and a failing build.
+
+These commands don't ask before they act and take no `--yes`: confirm the
+summary with the user first, since every one changes the real project.
+
+## Create an app
+
+```sh
+unity pipeline automation apps create --name notifier --description "Posts build results to Slack channels" --version 1.0.0 --cloud-org "<org-id>" --format json
+unity pipeline automation apps create --name notifier --description "Posts build results to Slack channels" --version 1.0.0 --tag slack --metadata team=build --logo logo.png --cloud-org "<org-id>" --format json
+unity pipeline automation apps create --file app.json --name notifier-copy --version 1.0.0 --cloud-org "<org-id>" --format json
+```
+
+`apps create` creates an app in the organization and its first version, a draft.
+The result is that version, shaped as `apps get` shows one: the new app's ID is
+`data.app.id`, not the version object's `id`. Pass that ID to `apps get` and
+`apps versions`.
+
+| Option | Sets |
+|---|---|
+| `--name`, `--description`, `--version` | Required, from the option or `--file`. Name 2 to 64 characters, description 20 to 256, version like `1.0.0`, `1.0.0-rc.1` or `1.0.0-sha.abc1234` |
+| `--tag` (repeatable), `--url` | Tags and a link to the app's page |
+| `--metadata key=value` (repeatable) | Metadata entries, split on the first `=`, merged over the file's |
+| `--logo <path>` | A 128x128 PNG, JPG, GIF, TIFF or WEBP of at most 1 MB, sent base64 |
+| `--id <uuid>` | The app's ID, instead of a generated one |
+| `--file <path>` | The app as JSON (`-` reads stdin); options override its fields |
+
+A saved `apps get --format json` result works as `--file`: the CLI takes its
+app's name, description, URL, tags, logo and metadata, and its version, and
+leaves the existing app's ID behind. The copy keeps the source app's name, so
+pass a new `--name`, and a `--version` for the new app's first version.
+Lengths, the version, the ID and `--metadata` pairs are checked before any
+request (exit `2`). The service refuses an `--id` already in use, or a logo
+that isn't 128x128, with exit `6` and its details. Creating an
+app needs the Automation Developer role, and the organization must allow it;
+otherwise the service answers `AUTOMATION_FORBIDDEN`, exit `3`.
+
+`apps create` doesn't ask before it acts and takes no `--yes`: confirm the name
+and organization with the user first.
+
+## Add a version to an app
+
+```sh
+unity pipeline automation apps versions create "<app-id>" --version 1.1.0 --cloud-org "<org-id>" --format json
+unity pipeline automation apps versions create "<app-id>" --version 1.1.0 --base-version 1.0.0 --cloud-org "<org-id>" --format json
+```
+
+`apps versions create` adds a new draft version to an existing app. With
+`--base-version`, the new version starts as a copy of that version's actions
+and events; without it, it starts empty. Actions and events can only change
+while a version is a draft, so this is how to keep working on an app whose
+versions are published. The result is the new version, shaped as
+`apps versions get` shows one.
+
+`--version` is required. Both versions take the form `1.0.0`, `1.0.0-rc.1` or
+`1.0.0-sha.abc1234` and are checked before any request (exit `2`). The service
+refuses a version the app already has with exit `6` and its details, and an
+unknown app or base version with `AUTOMATION_RESOURCE_NOT_FOUND`, exit `6`. It
+needs the same role and organization setting as `apps create`; otherwise the
+service answers `AUTOMATION_FORBIDDEN`, exit `3`.
+
+`apps versions create` doesn't ask before it acts and takes no `--yes`: confirm
+the app and version with the user first.
 
 ## Trigger a pipeline and watch a job
 
@@ -505,7 +691,7 @@ They can only ask on an interactive terminal in human format, without
 `--non-interactive`, `--quiet`, or a CI system. Anywhere else they fail with
 `AUTOMATION_CONFIRMATION_REQUIRED`, exit `2`, unless `--yes` (`-y`) is given; a
 declined question is `AUTOMATION_CANCELLED_BY_USER`, exit `1`. No other command
-asks or accepts `--yes`. Pass `--yes` only when the user has asked for that exact
+asks or accepts `--yes`; the target setup commands don't ask either. Pass `--yes` only when the user has asked for that exact
 operation on that exact build or job.
 
 **Local cancellation.** A `SIGINT` (Ctrl-C) or `SIGTERM` during

@@ -160,6 +160,8 @@ unity editors prune --format json
 
 The report lists version, architecture, path, size, and status, then the total reclaimable size. With `--remove` in a non-interactive shell and no `-y, --yes`, it refuses rather than deleting unprompted. "Unused" is judged against the **project registry** (`unity projects`), so an editor used only by a project you never registered counts as unused — register it first, or verify with `unity editors prune` before adding `--remove`.
 
+When an Editor folder holds files this user can't delete (installed with `sudo` or by a package), `prune --remove`, `uninstall` and `editors upgrade --replace` remove it through an administrator password dialog, and only on a terminal: one line says why first. With no terminal on stdin, under `--non-interactive`, in CI, or with `--format json`/`ndjson`/`tsv`, they stop before anything is removed with exit 2 and code `UNINSTALL_ELEVATION_NEEDS_TERMINAL`. Run the command from a terminal or as root; `UNITY_NO_ELEVATE=1` skips the dialog but refuses the removal too.
+
 **`--remove-missing` is a separate, safer candidate class:** editors registered with `unity editors add` (typically internal branch builds) whose recorded install path no longer resolves on disk at all.
 
 ```bash
@@ -263,7 +265,7 @@ unity install 6000.0.47f1
 # Install with specific modules
 unity install 6000.0.47f1 --module windows-mono --module android
 
-# Install a specific changeset by hash
+# Install a specific changeset by hash (a changeset that is not that version's build exits 11, RELEASE_NOT_FOUND)
 unity install 6000.0.47f1 --changeset abc123def456
 
 # Include child modules
@@ -362,6 +364,20 @@ unity install 6000.0.47f1 --download-only --operating-system windows -m il2cpp -
 
 Each payload is checked against its published size and checksum before the run reports success, and a payload that fails is removed. Only the modules you name with `-m` are fetched, and the license gate is unchanged: a non-interactive run needs `--accept-eula`. The envelope's items end as `downloaded` (listed in `data.completedUids`) and `data.path` is the download folder; the human summary says where the files are and that nothing was installed. `-d/--download-directory` still means a portable install and cannot be combined with it, nor can `--resume`, `--set-default` or `--list-modules` (exit 2). `--changeset` with another OS's `--operating-system` is still refused.
 
+#### Headless Linux Editor (`--headless`)
+
+On Linux, a release can also ship a headless Editor that runs with no display, for CI and servers. `unity install` never picks it on its own:
+
+- `--headless` installs the headless Editor. A release without one, or a macOS or Windows target, fails with `INSTALL_HEADLESS_UNAVAILABLE`. The bundled catalog doesn't list the headless Editor, so the same error appears when the CLI falls back to it offline.
+- Without it, the version picker (`unity install` with no version, on a terminal) asks which one, with the regular Editor selected. Any other run installs the regular Editor, even on a machine with no display.
+
+The headless Editor leaves out the modules it can't use, such as iOS and visionOS. A release without a headless Editor installs the regular one unless `--headless` was given.
+
+```bash
+# A CI image: the headless Editor and Android support
+unity install 6000.7.0f1 --headless -m android --accept-eula
+```
+
 #### Linux arm64: experimental x86_64 Editor under FEX-Emu
 
 Unity ships no Linux arm64 Editor. On a Linux arm64 host you can opt in to running the x86_64 Editor under [FEX-Emu](https://github.com/FEX-Emu/FEX) by setting `UNITY_EXPERIMENTAL_FEX_EMU=1`. The opt-in takes effect only when a FEX-Emu entry point (`FEX`, or the older `FEXLoader`) is on PATH and an x86_64 RootFS resolves (`FEX_ROOTFS`, or the `RootFS` in FEX-Emu's own `Config.json`); `unity doctor` reports both as its `fex-emu` row. While it is active, `unity install` defaults to `x86_64`, and every Editor launch (`open`, `projects open`, `run`, `test`, `build`, `projects create`) runs as `FEX <editor> <args>` with no `binfmt_misc` needed.
@@ -403,6 +419,9 @@ unity uninstall 6000.0.47f1 --yes
 # Uninstall a specific architecture
 unity uninstall 6000.0.47f1 --architecture arm64 --yes
 ```
+
+- The json result (and the one ndjson result frame) carries the removed Editor as `data.version` and `data.architecture`. Under `--format tsv` it is a `key<TAB>value` table of the same two members. A human run prints the completion line.
+- With no version, the stored default Editor is used and announced on stderr (`Using default editor version: ...`), so stdout stays the result alone under every format.
 
 ---
 

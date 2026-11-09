@@ -1,3 +1,3 @@
 # name upstream-url pinned-commit  (rewritten by scripts/update-game-plugins.sh --apply)
-unity-dev https://github.com/Unity-Technologies/unity-agent-plugin 759ad5fe88dda155eab0eda2187ac92e5455fa46
+unity-dev https://github.com/Unity-Technologies/unity-agent-plugin fb5e63e2f37ae4c9dbb2b6ba7de5e83d24bdf498
 game-trends https://github.com/malicaki/game-trend-skills b073dc7bae3c7eb4b4d248ba4d6ac052a8e9c9d5
