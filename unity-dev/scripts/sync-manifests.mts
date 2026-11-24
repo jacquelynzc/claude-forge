@@ -55,6 +55,10 @@ const targets: { file: string; set: (manifest: JsonObject) => void }[] = [
     set: (m) => {
       const entry = pluginEntry(m as Marketplace);
       delete entry.version;
+      // Display fields: the entry's value is what users see in /plugin before install.
+      for (const key of ['author', 'homepage', 'repository', 'license', 'keywords'] as const) {
+        setKey(entry, key, structuredClone(meta[key]));
+      }
       entry.category = meta.category;
     },
   },
@@ -103,13 +107,15 @@ for (const { file, set } of targets) {
   else writeFileSync(file, after);
 }
 
-// The sample `codex plugin list` and `agy plugin list` output in the README shows the version.
-// Only those two lines are matched, so other version numbers in the README are left alone.
+// The sample `codex plugin list`, `agy plugin list` and `copilot plugin list` output in the
+// README shows the version. Only those three lines are matched, so other version numbers in
+// the README are left alone.
 const readme = '.github/README.md';
 // Group 1 is the text before the version, group 2 the version itself.
 const samples = [
   /^(unity@unity-agent-plugin\s+installed, enabled\s+)(\S+)$/m,
   /^(- unity \(enabled, )([^)]+)\)$/m,
+  /^(\s+• unity@unity-agent-plugin \(v)([^)]+)\)$/m,
 ];
 let readmeText = readFileSync(readme, 'utf8').replace(/\r\n/g, '\n');
 const staleVersions = new Set<string>();
